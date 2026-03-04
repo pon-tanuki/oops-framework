@@ -145,7 +145,7 @@ FILE_PATH_NORMALIZED="${FILE_PATH#./}"
 
 # Detect file type
 IS_TEST_FILE=false
-if [[ "$FILE_PATH_NORMALIZED" =~ test|spec|__tests__|\.test\.|\.spec\. ]]; then
+if [[ "$FILE_PATH_NORMALIZED" =~ \.test\.|\.spec\.|/test/|/tests/|/spec/|/__tests__/ ]]; then
   IS_TEST_FILE=true
 fi
 

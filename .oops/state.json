@@ -4,8 +4,8 @@
   "sessionId": "",
   "orchestratorId": "",
   "locked": false,
-  "oopsCount": 0,
-  "lastOops": null,
+  "oopsCount": 2,
+  "lastOops": "2026-03-04T12:00:14Z",
   "testResults": {
     "passed": 0,
     "failed": 0,
@@ -14,6 +14,6 @@
   "metadata": {
     "created": "2026-03-04T00:00:00Z",
     "phase0Start": null,
-    "lastUpdate": "2026-03-04T00:00:00Z"
+    "lastUpdate": "2026-03-04T12:00:14Z"
   }
 }
