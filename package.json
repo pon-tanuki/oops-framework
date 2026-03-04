@@ -1,0 +1,24 @@
+{
+  "name": "oops-framework",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OOPS Framework - No more 'Oops, I broke it again!'",
+  "type": "module",
+  "bin": {
+    "oops": "./bin/oops"
+  },
+  "scripts": {
+    "oops": "tsx src/cli/index.ts",
+    "test": "jest test-files/"
+  },
+  "dependencies": {
+    "chalk": "^5.4.0",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "jest": "^30.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
+  }
+}
