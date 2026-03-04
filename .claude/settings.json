@@ -1,0 +1,8 @@
+{
+  "hooks": {
+    "PreToolUse": {
+      "command": ".claude/hooks/oops-gate.sh",
+      "description": "OOPS Framework - Enforces TDD phases by controlling file access"
+    }
+  }
+}
