@@ -415,17 +415,30 @@ for each task:
 
 #### 制約
 
-- **Can**: `*.test.ts`, `*.spec.ts` ファイルを作成・編集
-- **Cannot**: 実装ファイル（`*.ts` 除く `*.test.ts`）を見る、編集する
+- **Can Edit**: `*.test.ts`, `*.spec.ts` ファイルを作成・編集
+- **Cannot Edit**: 実装ファイル（`*.ts` 除く `*.test.ts`）の編集（**物理的にブロック** - Claude Code Hooks）
+- **Cannot Read**: 実装ファイル（推奨・プロンプトベース）
 - **Must**: テストは失敗する（RED フェーズ）
+
+#### ファイルアクセス制御レベル
+
+| 操作 | テストファイル | 実装ファイル | 強制方法 |
+|---|---|---|---|
+| **Read** | ✅ 可能 | ⚠️ 推奨しない | プロンプト（物理的には可能） |
+| **Write/Edit** | ✅ 可能 | ❌ 不可 | **物理的ブロック**（PreToolUse hook） |
+
+**重要**:
+- **書き込み制限は物理的に強制**されます（Claude Code Hooks）
+- **読み取り制限はプロンプトベース**です（実装ファイルを「見ない」ようプロンプトで誘導）
+- REDフェーズでは実装が存在しないため、実際には読み取りの問題は発生しにくい
 
 #### "Oops"防止メカニズム
 
-| "Oops"の種類 | 防止方法 |
-|---|---|
-| "Oops, I wrote implementation!" | 実装ファイルへのアクセスをブロック |
-| "Oops, tests are passing!" | ゲートで検出し、やり直しを要求 |
-| "Oops, no edge cases!" | プロンプトでエッジケースを明示的に要求 |
+| "Oops"の種類 | 防止方法 | 強制レベル |
+|---|---|---|
+| "Oops, I wrote implementation!" | 実装ファイルへの書き込みをブロック | 🔒 **物理的** |
+| "Oops, tests are passing!" | ゲートで検出し、やり直しを要求 | 🚦 ゲート |
+| "Oops, no edge cases!" | プロンプトでエッジケースを明示的に要求 | 💬 プロンプト |
 
 #### システムプロンプト
 
@@ -501,18 +514,30 @@ Begin writing tests now. Remember: No implementation, no "Oops"!
 
 #### 制約
 
-- **Can**: 実装ファイル（`*.ts`）を作成・編集
-- **Can Read**: テストファイル（読み取り専用）
-- **Cannot**: テストファイルを変更
+- **Can Edit**: 実装ファイル（`*.ts`）を作成・編集
+- **Can Read**: テストファイル（読み取り可能）
+- **Cannot Edit**: テストファイルを変更（**物理的にブロック** - Claude Code Hooks）
 - **Must**: すべてのテストを成功させる
+
+#### ファイルアクセス制御レベル
+
+| 操作 | テストファイル | 実装ファイル | 強制方法 |
+|---|---|---|---|
+| **Read** | ✅ 可能 | ✅ 可能 | プロンプト（Readツールはhookでインターセプトしない） |
+| **Write/Edit** | ❌ 不可 | ✅ 可能 | **物理的ブロック**（PreToolUse hook） |
+
+**重要**:
+- **書き込み制限は物理的に強制**されます（Claude Code Hooks）
+- **読み取り制限はプロンプトベース**です（LLMの協力に依存）
+- 実用上、読み取りは許可されても問題ありません（テストを変更できないため）
 
 #### "Oops"防止メカニズム
 
-| "Oops"の種類 | 防止方法 |
-|---|---|
-| "Oops, I changed the tests!" | テストファイルへの書き込みをブロック |
-| "Oops, I over-engineered!" | YAGNIを強調、最小実装を要求 |
-| "Oops, tests still fail!" | ゲートで検出し、修正を要求 |
+| "Oops"の種類 | 防止方法 | 強制レベル |
+|---|---|---|
+| "Oops, I changed the tests!" | テストファイルへの書き込みをブロック | 🔒 **物理的** |
+| "Oops, I over-engineered!" | YAGNIを強調、最小実装を要求 | 💬 プロンプト |
+| "Oops, tests still fail!" | ゲートで検出し、修正を要求 | 🚦 ゲート |
 
 #### システムプロンプト
 
@@ -1007,6 +1032,230 @@ oops-gate.sh実行:
 | **PostToolUseはブロック不可** | 実行後の取り消しは不可 | PreToolUseで事前防止に集中 |
 | **タイムアウト（デフォルト10分）** | 長時間の処理は不可 | 簡潔なスクリプトを推奨 |
 | **JSONパース必須** | `jq`コマンドへの依存 | `oops init`でインストール確認 |
+| **Readツールはインターセプトしない** | 読み取り制限は物理的に不可 | プロンプトで「見ない」よう誘導 |
+
+### フェーズ変更の権限モデル
+
+OOPSフレームワークでは、フェーズの変更は**Orchestratorのみ**が実行できます。これにより、Subagentやユーザーが勝手にフェーズを変更して、ゲート条件をスキップすることを防ぎます。
+
+#### 権限レベル
+
+| ロール | フェーズ読み取り | フェーズ変更 | ゲートチェック |
+|---|---|---|---|
+| **Orchestrator** | ✅ 可能 | ✅ 可能 | ✅ 実行 |
+| **Test Writer Agent** | ✅ 可能 | ❌ 不可 | ❌ 不可 |
+| **Implementation Agent** | ✅ 可能 | ❌ 不可 | ❌ 不可 |
+| **Refactor Agent** | ✅ 可能 | ❌ 不可 | ❌ 不可 |
+| **User (CLI)** | ✅ 可能 | ⚠️ 制限付き | ✅ 実行可能 |
+
+#### フェーズ変更の実装
+
+```bash
+# .oops/state.json の構造
+{
+  "phase": "RED",
+  "sessionId": "abc123",
+  "orchestratorId": "main-session-xyz",
+  "locked": true,
+  "lastModified": "2026-03-04T10:00:00Z"
+}
+```
+
+**ロックメカニズム**:
+1. Orchestratorがフェーズを変更する際、`locked: true`とsessionIdを記録
+2. 他のエージェントがフェーズ変更を試みると、`oops-gate.sh`が拒否
+3. ゲートチェック後のみ、Orchestratorがロックを解除して次フェーズへ
+
+#### フェーズ変更フロー
+
+```
+Orchestrator
+    ↓
+1. Gate Check (red-to-green)
+    ↓
+2. Gate Pass?
+    ↓ Yes
+3. Lock state.json
+    ↓
+4. Update phase to "GREEN"
+    ↓
+5. Launch Implementation Agent
+    ↓
+6. Implementation completes
+    ↓
+7. Gate Check (green-to-refactor)
+    ↓
+8. Gate Pass?
+    ↓ Yes
+9. Update phase to "REFACTOR"
+```
+
+**不正なフェーズ変更の防止**:
+```bash
+# Subagentがフェーズ変更を試みた場合
+$ oops phase green  # Subagentから実行
+
+❌ Error: Phase change denied
+Reason: Only Orchestrator can change phases
+Current phase locked by: main-session-xyz
+
+To change phase:
+1. Complete current phase tasks
+2. Pass gate check
+3. Let Orchestrator manage phase transition
+```
+
+### エラーリカバリーと安定性
+
+OOPSフレームワークは、予期しないエラーや障害からの回復メカニズムを提供します。
+
+#### 1. Hookクラッシュ時の動作
+
+**問題**: `.claude/hooks/oops-gate.sh`がクラッシュした場合、ファイルアクセス制限が機能しない
+
+**対策**:
+
+```bash
+# oops-gate.sh の冒頭でエラーハンドリング
+set -euo pipefail
+
+# エラー時のフェールセーフ
+trap 'handle_error $?' ERR
+
+handle_error() {
+  echo "Hook error occurred. Defaulting to DENY for safety." >&2
+  jq -n '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: "Hook script error. Operation blocked for safety."
+    }
+  }'
+  exit 0
+}
+```
+
+**原則**: **Fail-safe（安全側に倒す）**
+- Hookがエラーの場合 → デフォルトで`deny`
+- ステートファイルが読めない場合 → フェーズなしとして扱い、すべて`deny`
+
+#### 2. ステートファイル破損時の回復
+
+**問題**: `.oops/state.json`が破損した場合、フェーズ管理が不能
+
+**対策**:
+
+```bash
+# state.jsonの検証と復旧
+validate_state() {
+  if ! jq empty .oops/state.json 2>/dev/null; then
+    echo "State file corrupted. Restoring from backup..." >&2
+
+    # バックアップから復旧
+    if [ -f .oops/state.json.backup ]; then
+      cp .oops/state.json.backup .oops/state.json
+      return 0
+    fi
+
+    # バックアップもない場合、初期状態に
+    jq -n '{
+      phase: "NONE",
+      sessionId: "",
+      oopsCount: 0,
+      error: "State recovered from corruption"
+    }' > .oops/state.json
+  fi
+}
+
+# 書き込み前に必ずバックアップ
+backup_state() {
+  cp .oops/state.json .oops/state.json.backup
+}
+```
+
+#### 3. デバッグモード
+
+**目的**: Hooksの動作を詳細に記録し、問題のトラブルシューティングを容易にする
+
+**実装**:
+
+```bash
+# .oops/config.json
+{
+  "debug": true,
+  "logLevel": "verbose"
+}
+
+# oops-gate.sh でのデバッグログ
+if [ "$DEBUG_MODE" = "true" ]; then
+  echo "[DEBUG] Hook invoked at $(date)" >> .oops/debug.log
+  echo "[DEBUG] Tool: $TOOL_NAME, File: $FILE_PATH, Phase: $PHASE" >> .oops/debug.log
+fi
+```
+
+**デバッグログの出力例**:
+```
+.oops/
+├── debug.log          # Hook実行の詳細ログ
+├── state.json         # 現在の状態
+├── state.json.backup  # 状態のバックアップ
+└── oops-counter.json  # "Oops"の記録
+```
+
+#### 4. マルチプロジェクト対応
+
+**問題**: 複数のOOPSセッションを同時実行した場合、ステート管理が競合
+
+**対策**:
+
+```bash
+# セッションIDベースのステート管理
+.oops/
+├── sessions/
+│   ├── session-abc123.json  # セッション1
+│   ├── session-xyz789.json  # セッション2
+│   └── active-session       # 現在アクティブなセッションへのシンボリックリンク
+└── state.json -> sessions/active-session
+```
+
+**セッション分離**:
+```bash
+# 新しいセッション開始
+$ oops feature start "user-registration" --session=abc123
+Creating new session: abc123
+Session directory: .oops/sessions/session-abc123.json
+
+# セッション切り替え
+$ oops session switch xyz789
+Switched to session: xyz789
+```
+
+#### 5. 後方互換性とバージョン管理
+
+**問題**: Claude Codeのアップデートでhooksの仕様が変わる可能性
+
+**対策**:
+
+```bash
+# .oops/config.json にバージョン記録
+{
+  "oopsVersion": "1.0.0",
+  "claudeCodeVersion": "2.5.0",
+  "hooksApiVersion": "1"
+}
+
+# バージョンチェック
+check_compatibility() {
+  CLAUDE_VERSION=$(claude --version | grep -oP '\d+\.\d+\.\d+')
+
+  if ! is_compatible "$CLAUDE_VERSION" "$REQUIRED_VERSION"; then
+    echo "⚠️  Warning: Claude Code version mismatch"
+    echo "   Current: $CLAUDE_VERSION"
+    echo "   Required: $REQUIRED_VERSION"
+    echo "   OOPS may not work correctly. Consider updating."
+  fi
+}
+```
 
 ---
 
@@ -1188,6 +1437,22 @@ Goal: **Zero oops!** 🎉
 #   }
 # }
 
+# Error handling and fail-safe
+set -euo pipefail
+trap 'handle_error $?' ERR
+
+handle_error() {
+  echo "Hook error occurred. Defaulting to DENY for safety." >&2
+  jq -n '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: "Hook script error. Operation blocked for safety."
+    }
+  }'
+  exit 0
+}
+
 # Read hook input from stdin
 INPUT=$(cat)
 
@@ -1195,7 +1460,36 @@ INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name')
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""')
 
-# Get current OOPS phase from state file
+# Acquire lock to prevent race conditions
+LOCK_FILE=".oops/state.lock"
+LOCK_TIMEOUT=5
+
+acquire_lock() {
+  local waited=0
+  while [ -f "$LOCK_FILE" ] && [ $waited -lt $LOCK_TIMEOUT ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+
+  if [ -f "$LOCK_FILE" ]; then
+    echo "Warning: Lock timeout. Proceeding anyway." >&2
+  fi
+
+  # Create lock with PID
+  echo $$ > "$LOCK_FILE"
+}
+
+release_lock() {
+  rm -f "$LOCK_FILE"
+}
+
+# Ensure lock is released on exit
+trap release_lock EXIT
+
+# Acquire lock before reading state
+acquire_lock
+
+# Get current OOPS phase from state file (with lock protection)
 PHASE=$(jq -r '.phase // "NONE"' .oops/state.json 2>/dev/null || echo "NONE")
 
 # If no active OOPS session, allow everything
@@ -1214,6 +1508,25 @@ is_test_file() {
   [[ "$1" =~ \.(test|spec)\.(ts|js|tsx|jsx)$ ]]
 }
 
+# Atomic update of Oops counter (protected by existing lock)
+update_oops_counter() {
+  # Create backup before modification
+  cp .oops/state.json .oops/state.json.backup 2>/dev/null || true
+
+  # Read current count
+  OOPS_COUNT=$(jq -r '.oopsCount // 0' .oops/state.json)
+  OOPS_COUNT=$((OOPS_COUNT + 1))
+
+  # Atomic write with temp file
+  jq --arg count "$OOPS_COUNT" \
+     --arg timestamp "$(date -Iseconds)" \
+     '.oopsCount = ($count | tonumber) | .lastOops = $timestamp' \
+     .oops/state.json > .oops/state.json.tmp
+
+  # Atomic rename
+  mv .oops/state.json.tmp .oops/state.json
+}
+
 # Phase-specific restrictions
 case "$PHASE" in
   RED)
@@ -1227,11 +1540,8 @@ case "$PHASE" in
         }
       }'
 
-      # Update Oops counter
-      OOPS_COUNT=$(jq -r '.oopsCount // 0' .oops/state.json)
-      OOPS_COUNT=$((OOPS_COUNT + 1))
-      jq --arg count "$OOPS_COUNT" '.oopsCount = ($count | tonumber)' .oops/state.json > .oops/state.json.tmp
-      mv .oops/state.json.tmp .oops/state.json
+      # Update Oops counter (atomic operation with lock)
+      update_oops_counter
 
       exit 0
     fi
@@ -1248,11 +1558,8 @@ case "$PHASE" in
         }
       }'
 
-      # Update Oops counter
-      OOPS_COUNT=$(jq -r '.oopsCount // 0' .oops/state.json)
-      OOPS_COUNT=$((OOPS_COUNT + 1))
-      jq --arg count "$OOPS_COUNT" '.oopsCount = ($count | tonumber)' .oops/state.json > .oops/state.json.tmp
-      mv .oops/state.json.tmp .oops/state.json
+      # Update Oops counter (atomic operation with lock)
+      update_oops_counter
 
       exit 0
     fi
@@ -1279,8 +1586,38 @@ exit 0
 
 1. **Exit Code 0 + JSON output**: フックは常にexit 0で終了し、決定はJSON内の`permissionDecision`で表現
 2. **permissionDecision**: `"allow"` / `"deny"` / `"ask"` の3つの値
-3. **Oops Counter**: `deny`の場合、`.oops/state.json`のカウンターを増加
-4. **詳細なエラーメッセージ**: LLMにフィードバックし、次の行動を修正させる
+3. **Fail-safe error handling**: エラー発生時はデフォルトで`deny`（安全側に倒す）
+4. **Lock mechanism**: `.oops/state.lock`でrace conditionを防止（タイムアウト5秒）
+5. **Atomic updates**: ステートファイル更新はtemp file + mvで原子性を保証
+6. **Backup before write**: 更新前に`.oops/state.json.backup`を作成
+7. **Oops Counter**: `deny`の場合、カウンターをアトミックに増加
+8. **詳細なエラーメッセージ**: LLMにフィードバックし、次の行動を修正させる
+
+**競合対策の仕組み**:
+
+```
+Hook A                    Hook B
+  ↓                         ↓
+acquire_lock()          acquire_lock()
+  ↓ (success)              ↓ (wait...)
+read state.json             ↓ (wait...)
+  ↓                         ↓ (wait...)
+update counter              ↓ (wait...)
+  ↓                         ↓ (wait...)
+atomic write                ↓ (wait...)
+  ↓                         ↓ (wait...)
+release_lock()              ↓ (success)
+                            ↓
+                        read state.json
+                            ↓
+                        update counter
+                            ↓
+                        atomic write
+                            ↓
+                        release_lock()
+```
+
+これにより、複数のhookが同時実行されても、カウンターの更新が失われることはありません。
 
 #### テスト実行フック（oops-test-runner.sh）
 
@@ -1463,33 +1800,115 @@ Keep it up! Goal: Zero oops! 🎯
 
 ## 実装計画
 
-### Phase 0: Claude Code Hooks実証実験（3日間）
+### Phase 0: Claude Code Hooks実証実験（5-7日間）
 
 **目標**: Claude Code Hooksで実際にファイルアクセス制限ができることを検証
 
-**実験内容**:
-1. **PreToolUse hookのテスト**
-   - `Edit`/`Write`ツールのインターセプト
-   - `permissionDecision: "deny"`でブロックできることを確認
-   - LLMがエラーメッセージを受け取り、行動を修正することを確認
+#### Day 1-2: 基本機能の実装と検証
 
-2. **フェーズ別制限のテスト**
+1. **PreToolUse hookの実装**
+   - `.claude/hooks/oops-gate.sh`プロトタイプ作成
+   - `.oops/state.json`ステート管理の実装
+   - `Edit`/`Write`ツールのインターセプト確認
+   - `permissionDecision: "deny"`でブロック確認
+
+2. **基本動作の確認**
    - RED phase: 実装ファイルへの書き込みがブロックされるか
    - GREEN phase: テストファイルへの書き込みがブロックされるか
-   - エラーメッセージがLLMに正しく伝わるか
+   - Oopsカウンターが正しく記録されるか
 
-3. **PostToolUse hookのテスト**
+#### Day 3-4: LLM応答パターンの観察
+
+3. **LLMの学習効果テスト（10回実施）**
+   - エラーメッセージから修正するか観察
+   - 繰り返しエラーの頻度測定
+   - 修正成功率の計測
+
+4. **エラーメッセージの最適化**
+   - 短文 vs 詳細 vs JSON形式でA/Bテスト
+   - LLMが最も反応する形式を特定
+   - エラーメッセージテンプレートの改善
+
+#### Day 5: Subagentとの統合テスト
+
+5. **Subagentコンテキストでの動作確認**
+   - Orchestrator → Subagent起動 → Hooks発動の流れ
+   - フェーズ状態（`.oops/state.json`）の共有確認
+   - Subagentがhooksをバイパスできないことを確認
+
+6. **権限モデルの検証**
+   - Orchestratorのみがフェーズ変更できることを確認
+   - Subagentによる不正なフェーズ変更を防ぐ
+
+#### Day 6-7: パフォーマンスと安定性
+
+7. **パフォーマンステスト**
+   - 100回連続のEdit操作でタイムアウトなし確認
+   - Hook実行時間の測定（平均・最大）
+   - ボトルネックの特定
+
+8. **ステート管理の競合テスト**
+   - 並行アクセス時のrace condition確認
+   - ロックメカニズムの必要性評価
+
+9. **PostToolUse hookのテスト**
    - ファイル変更後の自動テスト実行
-   - テスト結果の自動収集
+   - テスト結果の自動収集と状態更新
 
-**成果物**:
-- 動作する`.claude/hooks/oops-gate.sh`プロトタイプ
-- 実証実験レポート（成功/失敗の記録）
-- 発見された制限事項のドキュメント
+#### 成功基準（定量）
 
-**次への判断基準**:
-- ✅ 成功: Phase 1 MVPに進む
-- ❌ 失敗: Option B（汎用フレームワーク）に切り替え
+**P0（必須）**:
+- [ ] PreToolUse hookインターセプト率: **100%**
+- [ ] ブロッキング成功率: **100%**
+- [ ] LLMの修正成功率: **≥70%**（10回中7回以上）
+- [ ] Subagentとhooksの正常動作: **100%**
+
+**P1（重要）**:
+- [ ] Oopsカウンター精度: **100%**
+- [ ] タイムアウト発生率: **0%**
+- [ ] ステート競合発生率: **0%**
+- [ ] Hook実行時間: **<500ms平均**
+
+#### 失敗基準
+
+以下のいずれかに該当する場合、実験を失敗と判断：
+- ❌ LLMが3回連続で同じエラーを繰り返す
+- ❌ Hookタイムアウト発生率 >10%
+- ❌ Subagentでhooksが動作しない
+- ❌ ステート管理で頻繁に競合が発生（>5%）
+
+#### 成果物
+
+1. **動作するプロトタイプ**
+   - `.claude/hooks/oops-gate.sh`
+   - `.claude/hooks/oops-test-runner.sh`
+   - `.oops/state.json`スキーマ
+
+2. **実証実験レポート**
+   - 成功/失敗の記録（定量データ付き）
+   - LLM応答パターンの分析
+   - パフォーマンスデータ（実行時間、タイムアウト率）
+   - 発見された制限事項のドキュメント
+
+3. **Phase 1への推奨事項リスト**
+   - エラーメッセージの最適形式
+   - パフォーマンス改善の必要性
+   - 追加機能の優先順位
+
+#### 次への判断基準
+
+**✅ Phase 1 MVPへ進む条件**:
+- 全P0検証項目（4項目）が100%合格
+- P1検証項目の80%以上（4項目中3項目以上）が合格
+- 致命的なパフォーマンス問題がない
+
+**⚠️ 設計修正後に再実験**:
+- P0項目の一部が不合格だが、修正可能と判断
+- 例: エラーメッセージ形式の変更で改善が見込める
+
+**❌ Option B（汎用フレームワーク）へ切り替え**:
+- 失敗基準に該当
+- P0項目の複数が不合格で、修正が困難
 
 ---
 
