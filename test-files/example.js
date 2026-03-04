@@ -2,7 +2,7 @@
 // This should be allowed in NONE phase
 
 function add(a, b) {
-  // Modified during RED phase - this should be BLOCKED
+  // REFACTOR phase - both edits allowed
   return a + b;
 }
 

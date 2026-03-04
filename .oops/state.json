@@ -1,11 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "phase": "RED",
+  "phase": "NONE",
   "sessionId": "",
   "orchestratorId": "",
   "locked": false,
-  "oopsCount": 2,
-  "lastOops": "2026-03-04T12:00:14Z",
+  "oopsCount": 5,
+  "lastOops": "2026-03-04T15:05:09Z",
   "testResults": {
     "passed": 0,
     "failed": 0,
@@ -14,6 +14,6 @@
   "metadata": {
     "created": "2026-03-04T00:00:00Z",
     "phase0Start": null,
-    "lastUpdate": "2026-03-04T12:00:14Z"
+    "lastUpdate": "2026-03-04T15:05:09Z"
   }
 }

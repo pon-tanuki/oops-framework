@@ -96,9 +96,12 @@ increment_oops() {
   echo "   File: ${file}" >&2
 }
 
-# Parse tool use request
-TOOL_NAME=$(echo "$CLAUDE_TOOL_USE_REQUEST" | jq -r '.toolName // empty')
-FILE_PATH=$(echo "$CLAUDE_TOOL_USE_REQUEST" | jq -r '.parameters.file_path // empty')
+# Read tool use request from stdin (Claude Code passes JSON via stdin)
+INPUT=$(cat)
+
+# Parse tool use request from stdin JSON
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 
 # Only intercept file write operations
 if [[ "$TOOL_NAME" != "Edit" && "$TOOL_NAME" != "Write" && "$TOOL_NAME" != "NotebookEdit" ]]; then
