@@ -29,3 +29,7 @@ test('divide handles negative numbers correctly', () => {
   expect(divide(-6, 3)).toBe(-2);
   expect(divide(6, -3)).toBe(-2);
 });
+
+test('modulo returns remainder', () => {
+  expect(modulo(10, 3)).toBe(1);
+});

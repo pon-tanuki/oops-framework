@@ -26,4 +26,4 @@ function modulo(a, b) {
   return a % b;
 }
 
-module.exports = { add, subtract, multiply, divide, power };
+module.exports = { add, subtract, multiply, divide, power, modulo };

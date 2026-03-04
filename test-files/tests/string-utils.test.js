@@ -1,4 +1,4 @@
-// String utils tests for OOPS Phase 0 LLM learning tests
+// String utils tests - refactored during Phase 0
 const { capitalize, reverse, truncate } = require('../src/string-utils');
 
 test('capitalize first letter', () => {
