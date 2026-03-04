@@ -1048,18 +1048,147 @@ OOPSフレームワークでは、フェーズの変更は**Orchestratorのみ**
 | **Refactor Agent** | ✅ 可能 | ❌ 不可 | ❌ 不可 |
 | **User (CLI)** | ✅ 可能 | ⚠️ 制限付き | ✅ 実行可能 |
 
-#### フェーズ変更の実装
+#### ステートファイルスキーマ定義
 
-```bash
-# .oops/state.json の構造
+**`.oops/state.json` 完全スキーマ**:
+
+```json
 {
-  "phase": "RED",
-  "sessionId": "abc123",
-  "orchestratorId": "main-session-xyz",
-  "locked": true,
-  "lastModified": "2026-03-04T10:00:00Z"
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["phase", "sessionId", "oopsCount"],
+  "properties": {
+    "phase": {
+      "type": "string",
+      "enum": ["NONE", "RED", "GREEN", "REFACTOR"],
+      "description": "現在のフェーズ"
+    },
+    "sessionId": {
+      "type": "string",
+      "description": "セッションの一意識別子",
+      "examples": ["abc123", "session-2026-03-04-xyz"]
+    },
+    "orchestratorId": {
+      "type": "string",
+      "description": "Orchestratorのセッション識別子（フェーズ変更権限の確認用）"
+    },
+    "locked": {
+      "type": "boolean",
+      "description": "フェーズがロックされているか（Orchestratorのみが変更可能）",
+      "default": false
+    },
+    "oopsCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "防がれた'Oops'の総数（hookでのdeny回数）"
+    },
+    "lastOops": {
+      "type": "string",
+      "format": "date-time",
+      "description": "最後に'Oops'が発生した日時（ISO 8601形式）"
+    },
+    "lastModified": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ステートファイルの最終更新日時"
+    },
+    "testResults": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "成功したテストの数"
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "失敗したテストの数"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "総テスト数"
+        }
+      },
+      "description": "最新のテスト実行結果"
+    },
+    "featureName": {
+      "type": "string",
+      "description": "実装中の機能名",
+      "examples": ["user-registration", "email-validation"]
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "セッション開始日時"
+    }
+  }
 }
 ```
+
+**各フェーズでのステート例**:
+
+```bash
+# NONE（セッション開始前）
+{
+  "phase": "NONE",
+  "sessionId": "",
+  "oopsCount": 0,
+  "locked": false,
+  "lastModified": "2026-03-04T09:00:00Z"
+}
+
+# RED（テスト作成中）
+{
+  "phase": "RED",
+  "sessionId": "session-abc123",
+  "orchestratorId": "main-session-xyz",
+  "locked": true,
+  "oopsCount": 2,
+  "lastOops": "2026-03-04T10:15:30Z",
+  "lastModified": "2026-03-04T10:15:30Z",
+  "featureName": "user-registration",
+  "startedAt": "2026-03-04T10:00:00Z"
+}
+
+# GREEN（実装中）
+{
+  "phase": "GREEN",
+  "sessionId": "session-abc123",
+  "orchestratorId": "main-session-xyz",
+  "locked": true,
+  "oopsCount": 3,
+  "lastOops": "2026-03-04T10:30:15Z",
+  "lastModified": "2026-03-04T10:35:00Z",
+  "testResults": {
+    "passed": 0,
+    "failed": 5,
+    "total": 5
+  },
+  "featureName": "user-registration",
+  "startedAt": "2026-03-04T10:00:00Z"
+}
+
+# REFACTOR（リファクタリング中）
+{
+  "phase": "REFACTOR",
+  "sessionId": "session-abc123",
+  "orchestratorId": "main-session-xyz",
+  "locked": true,
+  "oopsCount": 3,
+  "lastModified": "2026-03-04T11:00:00Z",
+  "testResults": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5
+  },
+  "featureName": "user-registration",
+  "startedAt": "2026-03-04T10:00:00Z"
+}
+```
+
+#### フェーズ変更の実装
 
 **ロックメカニズム**:
 1. Orchestratorがフェーズを変更する際、`locked: true`とsessionIdを記録
@@ -1439,19 +1568,40 @@ Goal: **Zero oops!** 🎉
 
 # Error handling and fail-safe
 set -euo pipefail
-trap 'handle_error $?' ERR
+
+# エラーハンドリング: 常にexit 0でJSONを返す
+# エラー時はデフォルトでDENY（安全側に倒す）
+trap 'handle_error $? $LINENO' ERR
 
 handle_error() {
-  echo "Hook error occurred. Defaulting to DENY for safety." >&2
-  jq -n '{
+  local exit_code=$1
+  local line_num=$2
+
+  echo "Hook error at line $line_num (exit code: $exit_code). Defaulting to DENY for safety." >&2
+
+  # 常にJSONを返してexit 0（Claude Code Hooksの要件）
+  jq -n --arg line "$line_num" --arg code "$exit_code" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: "Hook script error. Operation blocked for safety."
+      permissionDecisionReason: "Hook script error at line \($line) (exit \($code)). Operation blocked for safety. Check .oops/debug.log for details."
     }
   }'
   exit 0
 }
+
+# jqが存在するかチェック
+if ! command -v jq &> /dev/null; then
+  echo "Error: jq is not installed. Install with: apt-get install jq" >&2
+  # jqがないのでJSON生成不可 - 緊急措置としてexit 2
+  exit 2
+fi
+
+# state.jsonが読めるかチェック
+if [ ! -r .oops/state.json ]; then
+  # ファイルがない or 読めない → セッションなしとして処理
+  echo "Warning: .oops/state.json not found or not readable. No active OOPS session." >&2
+fi
 
 # Read hook input from stdin
 INPUT=$(cat)
@@ -1466,17 +1616,35 @@ LOCK_TIMEOUT=5
 
 acquire_lock() {
   local waited=0
-  while [ -f "$LOCK_FILE" ] && [ $waited -lt $LOCK_TIMEOUT ]; do
+  while [ -f "$LOCK_FILE" ] && [ $waited -lt $((LOCK_TIMEOUT * 10)) ]; do
     sleep 0.1
     waited=$((waited + 1))
   done
 
   if [ -f "$LOCK_FILE" ]; then
-    echo "Warning: Lock timeout. Proceeding anyway." >&2
+    # Lock timeout - 安全のためDENYする（fail-safe）
+    echo "Lock timeout after ${LOCK_TIMEOUT}s. Denying operation for safety." >&2
+
+    # 古いロックを削除（5秒以上経過している場合はstaleと判断）
+    local lock_age=$(($(date +%s) - $(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)))
+    if [ $lock_age -gt 5 ]; then
+      echo "Lock file is stale (${lock_age}s old). Removing..." >&2
+      rm -f "$LOCK_FILE"
+    else
+      # 新しいロック → 並行処理が進行中
+      jq -n '{
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: "Concurrent operation detected. Lock timeout. Please retry in a moment."
+        }
+      }'
+      exit 0
+    fi
   fi
 
-  # Create lock with PID
-  echo $$ > "$LOCK_FILE"
+  # Create lock with PID and timestamp
+  echo "$$:$(date +%s)" > "$LOCK_FILE"
 }
 
 release_lock() {
@@ -1618,6 +1786,207 @@ release_lock()              ↓ (success)
 ```
 
 これにより、複数のhookが同時実行されても、カウンターの更新が失われることはありません。
+
+#### サニティチェックスクリプト（oops-sanity-check.sh）
+
+Phase 0開始前に、OOPS環境が正しくセットアップされているか検証します。
+
+```bash
+#!/bin/bash
+# .claude/hooks/oops-sanity-check.sh
+#
+# OOPS Framework - Sanity Check Script
+#
+# Verifies that all prerequisites are met before starting Phase 0
+
+echo "🔍 OOPS Framework Sanity Check"
+echo "=============================="
+echo ""
+
+ERRORS=0
+WARNINGS=0
+
+# 1. jq がインストールされているか
+echo -n "Checking jq installation... "
+if command -v jq &> /dev/null; then
+  JQ_VERSION=$(jq --version)
+  echo "✅ $JQ_VERSION"
+else
+  echo "❌ NOT FOUND"
+  echo "   Install: apt-get install jq (or brew install jq)"
+  ERRORS=$((ERRORS + 1))
+fi
+
+# 2. .oops/ ディレクトリが存在するか
+echo -n "Checking .oops/ directory... "
+if [ -d ".oops" ]; then
+  echo "✅ EXISTS"
+else
+  echo "⚠️  NOT FOUND (will be created by oops init)"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# 3. state.json が有効なJSONか
+echo -n "Checking .oops/state.json... "
+if [ -f ".oops/state.json" ]; then
+  if jq empty .oops/state.json 2>/dev/null; then
+    PHASE=$(jq -r '.phase // "NONE"' .oops/state.json)
+    echo "✅ VALID (phase: $PHASE)"
+  else
+    echo "❌ INVALID JSON"
+    ERRORS=$((ERRORS + 1))
+  fi
+else
+  echo "⚠️  NOT FOUND (will be created by oops init)"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# 4. Hookスクリプトが実行可能か
+echo -n "Checking oops-gate.sh... "
+if [ -f ".claude/hooks/oops-gate.sh" ]; then
+  if [ -x ".claude/hooks/oops-gate.sh" ]; then
+    echo "✅ EXECUTABLE"
+  else
+    echo "❌ NOT EXECUTABLE"
+    echo "   Fix: chmod +x .claude/hooks/oops-gate.sh"
+    ERRORS=$((ERRORS + 1))
+  fi
+else
+  echo "⚠️  NOT FOUND (needs implementation)"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# 5. Claude Code settings.json が存在するか
+echo -n "Checking .claude/settings.json... "
+if [ -f ".claude/settings.json" ]; then
+  echo "✅ EXISTS"
+
+  # Hooksが登録されているか確認
+  echo -n "Checking hooks registration... "
+  if jq -e '.hooks.PreToolUse' .claude/settings.json &>/dev/null; then
+    echo "✅ REGISTERED"
+  else
+    echo "⚠️  NOT REGISTERED (run oops init to register)"
+    WARNINGS=$((WARNINGS + 1))
+  fi
+else
+  echo "⚠️  NOT FOUND (will be created)"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# 6. テストランナーが利用可能か
+echo -n "Checking test runner (npm test)... "
+if [ -f "package.json" ]; then
+  if jq -e '.scripts.test' package.json &>/dev/null; then
+    echo "✅ CONFIGURED"
+  else
+    echo "⚠️  NO TEST SCRIPT"
+    echo "   Add: \"test\": \"jest\" to package.json scripts"
+    WARNINGS=$((WARNINGS + 1))
+  fi
+else
+  echo "⚠️  NO package.json (not a Node.js project?)"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# 7. Gitリポジトリか
+echo -n "Checking git repository... "
+if git rev-parse --git-dir > /dev/null 2>&1; then
+  echo "✅ GIT REPO"
+else
+  echo "⚠️  NOT A GIT REPO"
+  echo "   OOPS works better with git for phase tracking"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# 8. ディスク容量チェック
+echo -n "Checking disk space... "
+AVAILABLE=$(df . | tail -1 | awk '{print $4}')
+if [ "$AVAILABLE" -gt 100000 ]; then  # 100MB以上
+  echo "✅ SUFFICIENT (${AVAILABLE}KB available)"
+else
+  echo "⚠️  LOW DISK SPACE (${AVAILABLE}KB available)"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# 9. ロックファイルの確認
+echo -n "Checking for stale locks... "
+if [ -f ".oops/state.lock" ]; then
+  LOCK_AGE=$(($(date +%s) - $(stat -c %Y .oops/state.lock)))
+  if [ $LOCK_AGE -gt 60 ]; then
+    echo "⚠️  STALE LOCK FOUND (${LOCK_AGE}s old)"
+    echo "   Remove: rm .oops/state.lock"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✅ ACTIVE LOCK (${LOCK_AGE}s old)"
+  fi
+else
+  echo "✅ NO LOCKS"
+fi
+
+# 10. デバッグモードの確認
+echo -n "Checking debug mode... "
+if [ -f ".oops/config.json" ]; then
+  if jq -e '.debug == true' .oops/config.json &>/dev/null; then
+    echo "✅ ENABLED"
+  else
+    echo "⚠️  DISABLED (enable for Phase 0: {\"debug\": true})"
+    WARNINGS=$((WARNINGS + 1))
+  fi
+else
+  echo "⚠️  NO CONFIG (create .oops/config.json)"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# サマリー
+echo ""
+echo "=============================="
+if [ $ERRORS -eq 0 ]; then
+  echo "✅ Sanity check PASSED"
+  echo "   Errors: $ERRORS"
+  echo "   Warnings: $WARNINGS"
+  echo ""
+  echo "Ready to start Phase 0! Run: oops feature start <name>"
+  exit 0
+else
+  echo "❌ Sanity check FAILED"
+  echo "   Errors: $ERRORS (must fix)"
+  echo "   Warnings: $WARNINGS (optional)"
+  echo ""
+  echo "Fix the errors above before starting Phase 0."
+  exit 1
+fi
+```
+
+**使用方法**:
+
+```bash
+# Phase 0開始前に実行
+$ chmod +x .claude/hooks/oops-sanity-check.sh
+$ .claude/hooks/oops-sanity-check.sh
+
+🔍 OOPS Framework Sanity Check
+==============================
+
+Checking jq installation... ✅ jq-1.6
+Checking .oops/ directory... ✅ EXISTS
+Checking .oops/state.json... ✅ VALID (phase: NONE)
+Checking oops-gate.sh... ✅ EXECUTABLE
+Checking .claude/settings.json... ✅ EXISTS
+Checking hooks registration... ✅ REGISTERED
+Checking test runner (npm test)... ✅ CONFIGURED
+Checking git repository... ✅ GIT REPO
+Checking disk space... ✅ SUFFICIENT (5000000KB available)
+Checking for stale locks... ✅ NO LOCKS
+Checking debug mode... ✅ ENABLED
+
+==============================
+✅ Sanity check PASSED
+   Errors: 0
+   Warnings: 0
+
+Ready to start Phase 0! Run: oops feature start <name>
+```
 
 #### テスト実行フック（oops-test-runner.sh）
 
@@ -1820,9 +2189,62 @@ Keep it up! Goal: Zero oops! 🎯
 #### Day 3-4: LLM応答パターンの観察
 
 3. **LLMの学習効果テスト（10回実施）**
-   - エラーメッセージから修正するか観察
-   - 繰り返しエラーの頻度測定
-   - 修正成功率の計測
+
+**修正成功の定義**:
+- ✅ **成功**: エラー後、**1回の試行**で正しいファイルを選択
+- ❌ **失敗**: 2回以上同じエラーを繰り返す
+- ➖ **除外**: システムエラー（hook障害、ネットワークエラーなど）
+
+**測定方法**:
+1. **10個の異なるタスクを実施**
+   - Task 1: RED phaseでUserService.tsを編集しようとする → 拒否 → UserService.test.tsを選択
+   - Task 2: GREEN phaseでUserService.test.tsを編集しようとする → 拒否 → UserService.tsを選択
+   - Task 3-10: 同様のパターンで異なるファイル名・フェーズで実施
+
+2. **各タスクで記録するデータ**:
+   ```
+   Task 1:
+   - 試行1: UserService.ts (RED phase) → DENY
+   - 試行2: UserService.test.ts → ALLOW
+   - 結果: 成功（1回で修正）
+
+   Task 2:
+   - 試行1: UserService.test.ts (GREEN phase) → DENY
+   - 試行2: UserService.test.ts → DENY（同じエラー）
+   - 試行3: UserService.ts → ALLOW
+   - 結果: 失敗（2回繰り返した）
+   ```
+
+3. **成功率の計算**:
+   ```
+   成功率 = 成功タスク数 / 有効タスク数 × 100%
+   目標: ≥70%（10タスク中7タスク以上で成功）
+   ```
+
+**記録フォーマット**:
+```json
+{
+  "llm_learning_test": {
+    "total_tasks": 10,
+    "successful_tasks": 7,
+    "failed_tasks": 3,
+    "excluded_tasks": 0,
+    "success_rate": 70.0,
+    "details": [
+      {
+        "task_id": 1,
+        "phase": "RED",
+        "attempts": [
+          {"file": "UserService.ts", "result": "DENY"},
+          {"file": "UserService.test.ts", "result": "ALLOW"}
+        ],
+        "outcome": "success",
+        "attempts_to_success": 1
+      }
+    ]
+  }
+}
+```
 
 4. **エラーメッセージの最適化**
    - 短文 vs 詳細 vs JSON形式でA/Bテスト
@@ -1832,28 +2254,250 @@ Keep it up! Goal: Zero oops! 🎯
 #### Day 5: Subagentとの統合テスト
 
 5. **Subagentコンテキストでの動作確認**
-   - Orchestrator → Subagent起動 → Hooks発動の流れ
-   - フェーズ状態（`.oops/state.json`）の共有確認
-   - Subagentがhooksをバイパスできないことを確認
+
+**Test Case 1: Basic Subagent Invocation with Hooks**
+```bash
+# 準備
+$ echo '{"phase":"RED","sessionId":"test-123","oopsCount":0}' > .oops/state.json
+$ chmod +x .claude/hooks/oops-gate.sh
+
+# テスト実行
+$ claude-code
+> Task tool: oops-test-writer
+> Prompt: "Write tests for UserService"
+
+# 期待される動作
+1. Subagent起動
+2. Subagentが.oops/state.jsonを読み取り（phase="RED"確認）
+3. SubagentがUserService.tsを編集しようとする
+4. PreToolUse hookが発動
+5. oops-gate.shがphase="RED"を検出
+6. 実装ファイルへの書き込みをDENY
+7. エラーメッセージがSubagentに返る
+8. SubagentがUserService.test.tsに変更
+
+# 検証項目
+- [ ] .oops/debug.logにhook実行記録あり
+- [ ] .oops/state.jsonのoopsCountが1増加
+- [ ] SubagentがDENYメッセージを受信
+- [ ] SubagentがUserService.test.tsに修正
+```
+
+**Test Case 2: Phase Change Prevention from Subagent**
+```bash
+# 準備
+$ echo '{
+  "phase":"RED",
+  "sessionId":"test-123",
+  "orchestratorId":"main-xyz",
+  "locked":true,
+  "oopsCount":0
+}' > .oops/state.json
+
+# テスト実行（Subagentから）
+$ oops phase green
+
+# 期待される動作
+1. oops CLIがstate.jsonを読み取り
+2. locked=true && orchestratorId != current_session を検出
+3. フェーズ変更を拒否
+
+# 期待される出力
+❌ Error: Phase change denied
+Reason: Only Orchestrator can change phases
+Current phase locked by: main-xyz
+
+To change phase:
+1. Complete current phase tasks
+2. Pass gate check
+3. Let Orchestrator manage phase transition
+
+# 検証項目
+- [ ] フェーズがREDのまま（変更されていない）
+- [ ] エラーメッセージが表示される
+- [ ] .oops/state.jsonが変更されていない
+```
+
+**Test Case 3: Shared State - Oops Counter**
+```bash
+# 準備
+$ echo '{"phase":"RED","sessionId":"test-123","oopsCount":0}' > .oops/state.json
+
+# テスト実行
+1. Orchestrator: oops feature start "user-registration"
+2. Subagent (Test Writer): UserService.tsを編集 → DENY (oopsCount=1)
+3. Subagent (Test Writer): UserService.tsを再度編集 → DENY (oopsCount=2)
+4. Subagent (Test Writer): UserService.test.tsを編集 → ALLOW
+5. Orchestrator: oops stats を実行
+
+# 期待される出力
+📊 OOPS Framework Statistics
+
+Session: user-registration
+Phase: RED
+
+Oops Counter: 2 prevented
+  ✓ Prevented "Oops, I wrote implementation in RED phase!" (2 times)
+
+# 検証項目
+- [ ] Subagentの操作がカウンターに反映される
+- [ ] OrchestratorとSubagentが同じstate.jsonを共有
+- [ ] カウンターの更新に競合がない
+```
+
+**Test Case 4: Subagent Cannot Bypass Hooks**
+```bash
+# 準備: Subagentが直接ファイルを編集しようとする
+
+# テスト実行
+$ claude-code
+> Edit tool直接呼び出し
+> file_path: "src/UserService.ts" (phase=RED)
+
+# 期待される動作
+1. Edit toolが呼び出される
+2. PreToolUse hookが**必ず**発動（Subagentでもメインでも同じ）
+3. oops-gate.shが実行される
+4. phase=REDで実装ファイル → DENY
+5. Edit toolの実行がブロックされる
+
+# 検証項目
+- [ ] SubagentからのEdit/Write呼び出しでもhookが発動
+- [ ] Hookをバイパスする方法がない
+- [ ] .oops/debug.logにSubagentからの試行が記録される
+```
+
+**Test Case 5: Subagent Session Isolation**
+```bash
+# 準備: 複数のSubagentを並行実行
+
+# テスト実行
+1. Subagent A (RED phase): テスト作成中
+2. Subagent B (GREEN phase): 実装中 ← 異なるフェーズ
+
+# 期待される動作
+- 各Subagentは共通の.oops/state.jsonを参照
+- 最後に設定されたphaseがすべてのSubagentに適用される
+- または: セッションIDで分離（future enhancement）
+
+# 検証項目
+- [ ] 複数Subagent実行時の動作を記録
+- [ ] セッション分離の必要性を評価
+- [ ] 現在の設計で問題があれば報告
+```
 
 6. **権限モデルの検証**
+   - Test Case 2で確認済み
    - Orchestratorのみがフェーズ変更できることを確認
    - Subagentによる不正なフェーズ変更を防ぐ
 
-#### Day 6-7: パフォーマンスと安定性
+#### Day 6: パフォーマンスベースラインとテスト
 
-7. **パフォーマンステスト**
-   - 100回連続のEdit操作でタイムアウトなし確認
-   - Hook実行時間の測定（平均・最大）
-   - ボトルネックの特定
+7. **ベースライン測定（Hooks無効）**
 
-8. **ステート管理の競合テスト**
-   - 並行アクセス時のrace condition確認
-   - ロックメカニズムの必要性評価
+```bash
+# Hooksを一時的に無効化
+$ mv .claude/settings.json .claude/settings.json.bak
 
-9. **PostToolUse hookのテスト**
+# 100回のEdit操作を実行
+$ time for i in {1..100}; do
+  echo "// Edit $i" >> test-file.ts
+done
+
+# 結果を記録
+Baseline (no hooks):
+- 平均実行時間: XXms
+- 最大実行時間: XXms
+- タイムアウト: 0回
+```
+
+8. **パフォーマンステスト（Hooks有効）**
+
+```bash
+# Hooksを有効化
+$ mv .claude/settings.json.bak .claude/settings.json
+
+# 同じ100回のEdit操作を実行
+$ time for i in {1..100}; do
+  echo "// Edit $i" >> test-file.ts
+done
+
+# 結果を記録
+With hooks:
+- 平均実行時間: XXms
+- 最大実行時間: XXms
+- タイムアウト: 0回
+
+# オーバーヘッドの計算
+Overhead = (With hooks) - (Baseline)
+例: 120ms - 50ms = 70ms
+
+# 成功基準
+- ✅ オーバーヘッド < 100ms → 合格
+- ⚠️ オーバーヘッド 100-200ms → 要最適化だが許容
+- ❌ オーバーヘッド > 200ms → 要改善
+```
+
+**詳細な測定項目**:
+```json
+{
+  "performance_test": {
+    "baseline": {
+      "total_operations": 100,
+      "avg_time_ms": 50,
+      "max_time_ms": 120,
+      "min_time_ms": 30,
+      "timeout_count": 0
+    },
+    "with_hooks": {
+      "total_operations": 100,
+      "avg_time_ms": 120,
+      "max_time_ms": 250,
+      "min_time_ms": 80,
+      "timeout_count": 0
+    },
+    "overhead": {
+      "avg_ms": 70,
+      "percentage": "140%",
+      "assessment": "acceptable"
+    },
+    "bottlenecks": [
+      "jq parsing: 20ms",
+      "file I/O (state.json): 15ms",
+      "lock acquisition: 10ms"
+    ]
+  }
+}
+```
+
+#### Day 7: 安定性とストレステスト
+
+9. **ステート管理の競合テスト**
+
+```bash
+# 並行アクセステスト: 10個のEdit操作を同時実行
+$ for i in {1..10}; do
+  (echo "// Concurrent edit $i" >> test-$i.ts) &
+done
+wait
+
+# 検証項目
+- [ ] .oops/state.jsonが破損していない
+- [ ] oopsCountが正確（10増加）
+- [ ] ロックが正しく機能
+- [ ] デッドロックが発生しない
+
+# 結果記録
+Concurrent operations: 10
+State corruption: No
+Oops count accuracy: 100%
+Lock failures: 0
+```
+
+10. **PostToolUse hookのテスト**
    - ファイル変更後の自動テスト実行
    - テスト結果の自動収集と状態更新
+   - テスト実行時間の測定（<5秒が目標）
 
 #### 成功基準（定量）
 
@@ -1909,6 +2553,90 @@ Keep it up! Goal: Zero oops! 🎯
 **❌ Option B（汎用フレームワーク）へ切り替え**:
 - 失敗基準に該当
 - P0項目の複数が不合格で、修正が困難
+
+#### Phase 0完了後のクリーンアップ手順
+
+Phase 0実証実験が完了したら、以下の手順でOOPSを無効化し、通常のClaude Code動作に戻します。
+
+```bash
+# 1. OOPS Hooksを無効化
+$ oops phase disable
+
+Disabling OOPS hooks...
+  ✓ Removed PreToolUse hook from .claude/settings.json
+  ✓ Removed PostToolUse hook from .claude/settings.json
+  ✓ Archived .oops/state.json → .oops/phase0-results/state-final.json
+  ✓ Archived .oops/debug.log → .oops/phase0-results/debug.log
+  ✓ Claude Code back to normal mode
+
+OOPS disabled. Your hooks have been preserved in .claude/hooks/ for future use.
+
+# 2. Phase 0結果の保存
+$ oops phase0 report
+
+📊 Phase 0 Verification Experiment Results
+==========================================
+
+Duration: 2026-03-04 to 2026-03-11 (7 days)
+
+P0 Success Criteria:
+  ✅ Hook intercept rate: 100% (100/100)
+  ✅ Blocking success: 100% (50/50 denials)
+  ✅ LLM learning rate: 75% (7.5/10 tasks)
+  ✅ Subagent compatibility: 100% (5/5 tests)
+
+P1 Success Criteria:
+  ✅ Oops counter accuracy: 100%
+  ✅ Timeout rate: 0%
+  ✅ State conflicts: 0%
+  ⚠️  Hook overhead: 85ms (target: <100ms) - PASS
+
+Overall: ✅ PASS - Proceed to Phase 1 MVP
+
+Detailed report saved to: .oops/phase0-results/report.json
+
+# 3. 実験データのアーカイブ
+$ ls .oops/phase0-results/
+state-final.json
+debug.log
+report.json
+llm-learning-test.json
+performance-test.json
+subagent-test-cases.json
+
+# 4. 必要に応じてOOPS再有効化
+$ oops phase enable
+
+Enabling OOPS hooks...
+  ✓ Registered PreToolUse hook
+  ✓ Registered PostToolUse hook
+  ✓ Initialized .oops/state.json
+  ✓ OOPS is now active
+
+Start a new session: oops feature start <name>
+
+# 5. 完全削除（Phase 0後にOOPSが不要な場合）
+$ oops uninstall
+
+⚠️  This will remove all OOPS files and hooks.
+Are you sure? (y/N) y
+
+Uninstalling OOPS Framework...
+  ✓ Removed hooks from .claude/settings.json
+  ✓ Backed up to .oops-backup-2026-03-11.tar.gz
+  ✓ Deleted .claude/hooks/oops-*.sh
+  ✓ Deleted .oops/ directory
+
+OOPS uninstalled. Backup available: .oops-backup-2026-03-11.tar.gz
+```
+
+**クリーンアップチェックリスト**:
+- [ ] `oops phase disable`でhooksを無効化
+- [ ] Phase 0実証実験レポートを生成・保存
+- [ ] `.oops/phase0-results/`に全データをアーカイブ
+- [ ] Phase 1に進む場合は`oops phase enable`で再有効化
+- [ ] OOPS不要な場合は`oops uninstall`で完全削除
+- [ ] バックアップファイル（`.oops-backup-*.tar.gz`）を保管
 
 ---
 
