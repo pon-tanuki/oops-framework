@@ -1,5 +1,5 @@
 import { readdirSync, existsSync } from 'node:fs';
-import { readState, updateState } from './state-manager.js';
+import { updateState } from './state-manager.js';
 import { readConfig } from './config-manager.js';
 import { runTests as defaultRunTests } from './test-runner.js';
 import type { GateResult, Phase, TestResult } from '../types.js';

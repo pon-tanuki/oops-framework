@@ -1,7 +1,8 @@
 import chalk from 'chalk';
 import { readConfig, writeConfig } from '../core/config-manager.js';
-import { DEFAULT_CONFIG, type OopsConfig } from '../types.js';
+import { DEFAULT_CONFIG } from '../types.js';
 import { CONFIG_FILE } from '../core/paths.js';
+import { CliError } from '../core/errors.js';
 
 export function showConfig(): void {
   const config = readConfig();
@@ -49,9 +50,7 @@ export function setConfig(key: string, value: string): void {
       config.features.postToolUseTestRunner = parseBool(value, key);
       break;
     default:
-      console.error(chalk.red(`Error: Unknown config key "${key}".`));
-      console.error(chalk.gray('  Available: testCommand, testFilePattern, debug, autoGateCheck, postToolUseTestRunner'));
-      process.exit(1);
+      throw new CliError(`Unknown config key "${key}".\n  Available: testCommand, testFilePattern, debug, autoGateCheck, postToolUseTestRunner`);
   }
 
   writeConfig(config);
@@ -66,6 +65,5 @@ export function resetConfig(): void {
 function parseBool(value: string, key: string): boolean {
   if (value === 'true' || value === '1') return true;
   if (value === 'false' || value === '0') return false;
-  console.error(chalk.red(`Error: "${key}" must be true/false (got "${value}").`));
-  process.exit(1);
+  throw new CliError(`"${key}" must be true/false (got "${value}").`);
 }

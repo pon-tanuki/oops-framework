@@ -1,8 +1,6 @@
-import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
-import { DEFAULT_CONFIG, type OopsConfig } from '../types.js';
+import { DEFAULT_CONFIG } from '../types.js';
 
 describe('Environment variable overrides', () => {
   // Save original env

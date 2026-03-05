@@ -21,6 +21,7 @@ import {
   addSubtaskCommand,
 } from '../commands/plan.js';
 import { setLogLevel, setColorsEnabled, setQuietMode } from '../core/logger.js';
+import { CliError } from '../core/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -31,11 +32,11 @@ const program = new Command();
 program
   .name('oops')
   .description('OOPS Framework - No more "Oops, I broke it again!"')
-  .version('0.5.0')
+  .version('0.6.0')
   .option('--debug', 'Enable debug output')
   .option('--no-color', 'Disable colored output')
   .option('--quiet', 'Suppress non-error output')
-  .hook('preAction', (_thisCommand, actionCommand) => {
+  .hook('preAction', (_thisCommand, _actionCommand) => {
     const opts = program.opts();
     if (opts.debug) {
       setLogLevel('debug');
@@ -210,4 +211,25 @@ program
     }
   });
 
-program.parse();
+// Commander catches errors in action handlers and re-throws them.
+// We catch CliError to display clean error messages without stack traces.
+program.exitOverride(); // Prevent commander from calling process.exit directly
+
+try {
+  program.parse();
+} catch (err: unknown) {
+  if (err instanceof CliError) {
+    console.error(chalk.red(`Error: ${err.message}`));
+    process.exit(err.exitCode);
+  }
+  // Commander throws CommanderError for --help, --version, etc.
+  // Re-throw unexpected errors.
+  const commanderErr = err as { code?: string; exitCode?: number };
+  if (commanderErr.code === 'commander.helpDisplayed' || commanderErr.code === 'commander.version') {
+    process.exit(0);
+  }
+  if (commanderErr.exitCode !== undefined) {
+    process.exit(commanderErr.exitCode);
+  }
+  throw err;
+}

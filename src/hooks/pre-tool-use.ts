@@ -46,7 +46,7 @@ function incrementOops(reason: string, filePath: string): void {
     }));
     const state = readState();
     process.stderr.write(`🚫 Oops #${state.oopsCount}: ${reason}\n   File: ${filePath}\n`);
-  } catch (err) {
+  } catch {
     // Lock failure should not prevent the deny response
     process.stderr.write(`🚫 Oops: ${reason}\n   File: ${filePath}\n`);
   }

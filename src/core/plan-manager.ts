@@ -22,7 +22,7 @@ export function readPlan(): OopsPlan {
     const raw = readFileSync(PLAN_FILE, 'utf-8');
     return JSON.parse(raw) as OopsPlan;
   } catch (err) {
-    throw new Error(`Failed to parse ${PLAN_FILE}: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`Failed to parse ${PLAN_FILE}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
 }
 

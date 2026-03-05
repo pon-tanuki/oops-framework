@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { readState } from '../core/state-manager.js';
 import { checkGate } from '../core/gate-checker.js';
 import type { Phase } from '../types.js';
+import { CliError } from '../core/errors.js';
 
 const GATE_MAP: Record<string, [Phase, Phase]> = {
   'red-to-green': ['RED', 'GREEN'],
@@ -18,23 +19,19 @@ export function runGateCheck(gateName?: string): void {
     else if (state.phase === 'GREEN') gateName = 'green-to-refactor';
     else if (state.phase === 'REFACTOR') gateName = 'refactor-done';
     else {
-      console.error(chalk.red('Error: No gate to check in NONE phase.'));
-      process.exit(1);
+      throw new CliError('No gate to check in NONE phase.');
     }
   }
 
   const gate = GATE_MAP[gateName];
   if (!gate) {
-    console.error(chalk.red(`Error: Unknown gate "${gateName}".`));
-    console.error(chalk.gray(`  Available: ${Object.keys(GATE_MAP).join(', ')}`));
-    process.exit(1);
+    throw new CliError(`Unknown gate "${gateName}".\n  Available: ${Object.keys(GATE_MAP).join(', ')}`);
   }
 
   const [from, to] = gate;
 
   if (state.phase !== from) {
-    console.error(chalk.red(`Error: Gate "${gateName}" requires ${from} phase, but current phase is ${state.phase}.`));
-    process.exit(1);
+    throw new CliError(`Gate "${gateName}" requires ${from} phase, but current phase is ${state.phase}.`);
   }
 
   console.log(chalk.bold(`\n🚦 Checking gate: ${from} -> ${to}`));
@@ -65,6 +62,6 @@ export function runGateCheck(gateName?: string): void {
   } else {
     console.log(chalk.red(`❌ ${result.reason}`));
     console.log();
-    process.exit(1);
+    throw new CliError(result.reason);
   }
 }

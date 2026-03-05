@@ -19,19 +19,13 @@ import { STATE_FILE, CONFIG_FILE } from '../core/paths.js';
 // --- Main ---
 
 function main(): void {
-  // Read stdin
-  let rawInput = '';
-  try {
-    rawInput = readFileSync(0, 'utf-8');
-  } catch {
-    return; // Silently exit if no stdin
-  }
-
+  // Read and parse stdin
   let input: { tool_name?: string; tool_input?: { file_path?: string } };
   try {
+    const rawInput = readFileSync(0, 'utf-8');
     input = JSON.parse(rawInput);
   } catch {
-    return; // Silently exit on parse error
+    return; // Silently exit if no stdin or parse error
   }
 
   const toolName = input.tool_name ?? '';
