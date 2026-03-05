@@ -1,5 +1,6 @@
 import { type Phase, type OopsState, VALID_TRANSITIONS } from '../types.js';
 import { readState, updateState } from './state-manager.js';
+import { readConfig } from './config-manager.js';
 import { checkGate } from './gate-checker.js';
 
 // Transitions that require gate checks
@@ -37,7 +38,9 @@ export function transitionPhase(to: Phase, options: { force?: boolean; skipGate?
   }
 
   // Gate check for gated transitions
-  if (!options.force && !options.skipGate && requiresGate(current.phase, to)) {
+  const config = readConfig();
+  const shouldGate = config.features.autoGateCheck && !options.force && !options.skipGate;
+  if (shouldGate && requiresGate(current.phase, to)) {
     const result = checkGate(current.phase, to);
     if (!result.passed) {
       throw new Error(`Gate check failed: ${result.reason}`);

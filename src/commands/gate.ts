@@ -44,7 +44,17 @@ export function runGateCheck(gateName?: string): void {
 
   if (result.details) {
     for (const detail of result.details) {
-      console.log(`  ${result.passed ? chalk.green('✓') : chalk.red('✗')} ${detail}`);
+      const icon = detail.startsWith('  ') ? '  ' : (result.passed ? chalk.green('✓') : chalk.red('✗'));
+      const text = detail.startsWith('  ') ? chalk.gray(detail) : detail;
+      console.log(`  ${icon} ${text}`);
+    }
+    console.log();
+  }
+
+  if (result.testOutput) {
+    console.log(chalk.bold('  🧪 Test Output:'));
+    for (const line of result.testOutput.split('\n')) {
+      console.log(chalk.gray(`     ${line}`));
     }
     console.log();
   }

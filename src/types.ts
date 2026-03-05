@@ -37,6 +37,7 @@ export interface GateResult {
   passed: boolean;
   reason: string;
   details?: string[];
+  testOutput?: string;
 }
 
 export interface TestResult {
