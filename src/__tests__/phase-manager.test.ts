@@ -1,11 +1,9 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, rmSync, existsSync } from 'node:fs';
 
 // Test in isolated temp directory
 const TEST_DIR = '.oops-test-tmp';
-const origCwd = process.cwd();
 
 // We test the logic directly by manipulating state files
 // and importing the modules

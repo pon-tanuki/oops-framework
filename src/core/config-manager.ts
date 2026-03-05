@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { type OopsConfig, DEFAULT_CONFIG } from '../types.js';
 import { OOPS_DIR, CONFIG_FILE } from './paths.js';
+import { logger } from './logger.js';
 
 /**
  * Environment variable overrides (highest priority):
@@ -33,7 +34,7 @@ export function readConfig(): OopsConfig {
       const raw = readFileSync(CONFIG_FILE, 'utf-8');
       config = { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
     } catch (err) {
-      process.stderr.write(`Warning: Failed to parse ${CONFIG_FILE}, using defaults: ${err instanceof Error ? err.message : String(err)}\n`);
+      logger.warn(`Failed to parse ${CONFIG_FILE}, using defaults: ${err instanceof Error ? err.message : String(err)}`);
       config = { ...DEFAULT_CONFIG };
     }
   }

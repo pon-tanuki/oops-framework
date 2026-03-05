@@ -2,14 +2,15 @@ import chalk from 'chalk';
 import { randomUUID } from 'node:crypto';
 import { readState, updateState } from '../core/state-manager.js';
 import { showStats } from './stats.js';
+import { CliError } from '../core/errors.js';
 
 export function startFeature(name: string): void {
   const state = readState();
 
   if (state.phase !== 'NONE') {
-    console.error(chalk.red(`Error: Cannot start feature while in ${state.phase} phase.`));
-    console.error(chalk.red('Run `oops feature complete` or `oops phase none` first.'));
-    process.exit(1);
+    throw new CliError(
+      `Cannot start feature while in ${state.phase} phase.\nRun \`oops feature complete\` or \`oops phase none\` first.`
+    );
   }
 
   const sessionId = `session-${randomUUID().slice(0, 8)}`;
@@ -46,8 +47,7 @@ export function completeFeature(): void {
   const state = readState();
 
   if (!state.featureName) {
-    console.error(chalk.red('Error: No active feature to complete.'));
-    process.exit(1);
+    throw new CliError('No active feature to complete.');
   }
 
   const name = state.featureName;

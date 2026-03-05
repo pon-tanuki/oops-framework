@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { type OopsState, DEFAULT_STATE } from '../types.js';
 import { OOPS_DIR, STATE_FILE, LOCK_FILE } from './paths.js';
+import { logger } from './logger.js';
 const LOCK_TIMEOUT_MS = 3000;
 const STALE_LOCK_AGE_S = 5;
 
@@ -50,7 +51,7 @@ export function readState(): OopsState {
     const raw = readFileSync(STATE_FILE, 'utf-8');
     return JSON.parse(raw) as OopsState;
   } catch (err) {
-    process.stderr.write(`Warning: Failed to parse ${STATE_FILE}, using defaults: ${err instanceof Error ? err.message : String(err)}\n`);
+    logger.warn(`Failed to parse ${STATE_FILE}, using defaults: ${err instanceof Error ? err.message : String(err)}`);
     return { ...DEFAULT_STATE };
   }
 }

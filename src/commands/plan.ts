@@ -12,6 +12,7 @@ import {
   deletePlan,
 } from '../core/plan-manager.js';
 import type { SubtaskStatus } from '../types.js';
+import { CliError } from '../core/errors.js';
 
 const STATUS_ICONS: Record<SubtaskStatus, string> = {
   pending: '\u2B1C',
@@ -33,13 +34,11 @@ function parseSubtaskArg(arg: string): { name: string; description: string } {
 
 export function createPlanCommand(goal: string, subtaskArgs: string[]): void {
   if (planExists()) {
-    console.error(chalk.red('Error: A plan already exists. Run `oops plan complete` or delete it first.'));
-    process.exit(1);
+    throw new CliError('A plan already exists. Run `oops plan complete` or delete it first.');
   }
 
   if (subtaskArgs.length === 0) {
-    console.error(chalk.red('Error: At least one subtask is required.'));
-    process.exit(1);
+    throw new CliError('At least one subtask is required.');
   }
 
   const subtaskDefs = subtaskArgs.map(parseSubtaskArg);
@@ -84,8 +83,7 @@ export function showPlan(): void {
 
 export function nextSubtask(): void {
   if (!planExists()) {
-    console.error(chalk.red('Error: No plan found. Run `oops plan create` first.'));
-    process.exit(1);
+    throw new CliError('No plan found. Run `oops plan create` first.');
   }
 
   const plan = readPlan();
@@ -116,16 +114,14 @@ export function nextSubtask(): void {
 
 export function doneSubtask(): void {
   if (!planExists()) {
-    console.error(chalk.red('Error: No plan found.'));
-    process.exit(1);
+    throw new CliError('No plan found.');
   }
 
   const plan = readPlan();
   const current = plan.subtasks.find((s) => s.status === 'in_progress');
 
   if (!current) {
-    console.error(chalk.red('Error: No subtask in progress. Run `oops plan next` first.'));
-    process.exit(1);
+    throw new CliError('No subtask in progress. Run `oops plan next` first.');
   }
 
   // Complete the feature first
@@ -151,17 +147,14 @@ export function doneSubtask(): void {
 
 export function completePlan(): void {
   if (!planExists()) {
-    console.error(chalk.red('Error: No plan found.'));
-    process.exit(1);
+    throw new CliError('No plan found.');
   }
 
   const plan = readPlan();
 
   if (!isAllCompleted(plan)) {
     const remaining = plan.subtasks.filter((s) => s.status === 'pending' || s.status === 'in_progress');
-    console.error(chalk.red(`Error: ${remaining.length} subtask(s) still remaining.`));
-    console.error(chalk.red('Complete or skip all subtasks first.'));
-    process.exit(1);
+    throw new CliError(`${remaining.length} subtask(s) still remaining.\nComplete or skip all subtasks first.`);
   }
 
   plan.status = 'completed';
@@ -182,27 +175,23 @@ export function completePlan(): void {
 
 export function skipSubtask(idStr: string): void {
   if (!planExists()) {
-    console.error(chalk.red('Error: No plan found.'));
-    process.exit(1);
+    throw new CliError('No plan found.');
   }
 
   const id = parseInt(idStr, 10);
   if (isNaN(id)) {
-    console.error(chalk.red(`Error: Invalid subtask ID: ${idStr}`));
-    process.exit(1);
+    throw new CliError(`Invalid subtask ID: ${idStr}`);
   }
 
   const plan = readPlan();
   const subtask = plan.subtasks.find((s) => s.id === id);
 
   if (!subtask) {
-    console.error(chalk.red(`Error: Subtask ${id} not found.`));
-    process.exit(1);
+    throw new CliError(`Subtask ${id} not found.`);
   }
 
   if (subtask.status === 'completed') {
-    console.error(chalk.red(`Error: Subtask ${id} is already completed.`));
-    process.exit(1);
+    throw new CliError(`Subtask ${id} is already completed.`);
   }
 
   updateSubtask(id, (s) => ({ ...s, status: 'skipped' }));
@@ -211,8 +200,7 @@ export function skipSubtask(idStr: string): void {
 
 export function addSubtaskCommand(subtaskArg: string): void {
   if (!planExists()) {
-    console.error(chalk.red('Error: No plan found. Run `oops plan create` first.'));
-    process.exit(1);
+    throw new CliError('No plan found. Run `oops plan create` first.');
   }
 
   const { name, description } = parseSubtaskArg(subtaskArg);

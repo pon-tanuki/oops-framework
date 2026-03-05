@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_STATE, DEFAULT_CONFIG, type OopsState } from '../types.js';
+import { DEFAULT_STATE, type OopsState } from '../types.js';
 
 const TEST_DIR = join(process.cwd(), '.oops-test-hooks');
 const OOPS_DIR = join(TEST_DIR, '.oops');
