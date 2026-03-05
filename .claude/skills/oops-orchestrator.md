@@ -7,6 +7,29 @@ description: Use when starting a TDD session with the OOPS Framework. Guides the
 
 You are managing a TDD session using the OOPS Framework. Follow these rules strictly.
 
+## Task Decomposition (大きなタスクの場合)
+
+機能開発の指示を受けたら、まずタスクの規模を判断する。
+
+**小さなタスク**（1〜3ファイル変更、テスト5件以下）:
+→ 直接 `./bin/oops feature start <name>` でOOPSサイクルを開始
+
+**大きなタスク**（4ファイル以上、または複数の独立した機能）:
+→ まず `./bin/oops plan create` でサブタスクに分解してから開始
+
+### サブタスク粒度ガイドライン
+- 1サブタスク = 1〜3ファイルの変更
+- テスト5件以下で検証可能な範囲
+- 「〜を実装」ではなく「〜関数/モジュールを作成」レベル
+
+### 大きなタスクのフロー
+1. タスクを分析し、サブタスクに分解する
+2. `./bin/oops plan create --goal "目標" --subtask "名前: 説明" ...` で計画を作成
+3. `./bin/oops plan next` で最初のサブタスクを開始（→ RED phase）
+4. RED → GREEN → REFACTOR サイクルを実行
+5. `./bin/oops plan done` で完了、次のサブタスクへ
+6. 全サブタスク完了後、`./bin/oops plan complete`
+
 ## Phase Overview
 
 | Phase | Allowed Files | Goal |
