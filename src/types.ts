@@ -77,3 +77,33 @@ export const DEFAULT_CONFIG: OopsConfig = {
     postToolUseTestRunner: false,
   },
 };
+
+// --- Plan types ---
+
+export type SubtaskStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+export type PlanStatus = 'planning' | 'in_progress' | 'completed';
+
+export interface Subtask {
+  id: number;
+  name: string;
+  description: string;
+  status: SubtaskStatus;
+  oopsCount: number;
+  cycles: number;
+}
+
+export interface OopsPlan {
+  goal: string;
+  createdAt: string;
+  status: PlanStatus;
+  currentSubtask: number | null;
+  subtasks: Subtask[];
+}
+
+export const DEFAULT_PLAN: OopsPlan = {
+  goal: '',
+  createdAt: '',
+  status: 'planning',
+  currentSubtask: null,
+  subtasks: [],
+};
