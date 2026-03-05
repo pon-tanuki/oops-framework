@@ -35,10 +35,13 @@ export function setPhase(target: string, options: { force?: boolean; skipGate?: 
 
   if (to === 'RED') {
     console.log(chalk.red('\n  Only test files can be modified.'));
+    console.log(chalk.gray('  Write a failing test, then: oops phase green'));
   } else if (to === 'GREEN') {
     console.log(chalk.green('\n  Only implementation files can be modified.'));
+    console.log(chalk.gray('  Make the test pass, then: oops phase refactor'));
   } else if (to === 'REFACTOR') {
     console.log(chalk.blue('\n  Both test and implementation files can be modified.'));
+    console.log(chalk.gray('  Refactor safely, then: oops feature complete'));
   } else {
     console.log(chalk.gray('\n  All restrictions lifted.'));
   }

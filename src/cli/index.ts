@@ -20,6 +20,8 @@ import {
   skipSubtask,
   addSubtaskCommand,
 } from '../commands/plan.js';
+import { resetOops } from '../commands/reset.js';
+import { showStatus } from '../commands/status.js';
 import { setLogLevel, setColorsEnabled, setQuietMode } from '../core/logger.js';
 import { CliError } from '../core/errors.js';
 
@@ -32,7 +34,7 @@ const program = new Command();
 program
   .name('oops')
   .description('OOPS Framework - No more "Oops, I broke it again!"')
-  .version('0.6.0')
+  .version('1.0.0')
   .option('--debug', 'Enable debug output')
   .option('--no-color', 'Disable colored output')
   .option('--quiet', 'Suppress non-error output')
@@ -99,6 +101,19 @@ program
   .alias('g')
   .description('Run gate check (auto-detects or specify: red-to-green, green-to-refactor)')
   .action((name) => runGateCheck(name));
+
+// oops status (default command - overview of everything)
+program
+  .command('status')
+  .description('Show unified status (phase, feature, plan)')
+  .action(() => showStatus());
+
+// oops reset
+program
+  .command('reset')
+  .description('Reset phase to NONE (--hard to wipe all state)')
+  .option('--hard', 'Wipe all state and delete active plan')
+  .action((options) => resetOops(options));
 
 // oops stats
 program
