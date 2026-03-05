@@ -28,8 +28,8 @@
   ],
   "scripts": {
     "oops": "tsx src/cli/index.ts",
-    "test": "jest test-files/",
-    "test:oops": "npx tsx --test src/__tests__/*.test.ts"
+    "test": "npx tsx --test src/__tests__/*.test.ts",
+    "test:demo": "jest test-files/"
   },
   "dependencies": {
     "chalk": "^5.4.0",
