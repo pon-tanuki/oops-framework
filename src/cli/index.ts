@@ -22,6 +22,8 @@ import {
 } from '../commands/plan.js';
 import { resetOops } from '../commands/reset.js';
 import { showStatus } from '../commands/status.js';
+import { runDoctor } from '../commands/doctor.js';
+import { showHistory } from '../commands/history.js';
 import { setLogLevel, setColorsEnabled, setQuietMode } from '../core/logger.js';
 import { CliError } from '../core/errors.js';
 
@@ -34,7 +36,7 @@ const program = new Command();
 program
   .name('oops')
   .description('OOPS Framework - No more "Oops, I broke it again!"')
-  .version('1.0.0')
+  .version('1.1.0')
   .option('--debug', 'Enable debug output')
   .option('--no-color', 'Disable colored output')
   .option('--quiet', 'Suppress non-error output')
@@ -114,6 +116,20 @@ program
   .description('Reset phase to NONE (--hard to wipe all state)')
   .option('--hard', 'Wipe all state and delete active plan')
   .action((options) => resetOops(options));
+
+// oops doctor
+program
+  .command('doctor')
+  .description('Diagnose OOPS Framework setup issues')
+  .action(() => runDoctor());
+
+// oops history
+program
+  .command('history')
+  .alias('h')
+  .description('Show completed session history')
+  .option('--limit <n>', 'Number of sessions to show', '10')
+  .action((options) => showHistory({ limit: parseInt(options.limit, 10) }));
 
 // oops stats
 program

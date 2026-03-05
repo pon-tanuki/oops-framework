@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { randomUUID } from 'node:crypto';
 import { readState, updateState } from '../core/state-manager.js';
+import { appendSession } from '../core/history-manager.js';
 import { showStats } from './stats.js';
 import { CliError } from '../core/errors.js';
 
@@ -52,6 +53,16 @@ export function completeFeature(): void {
 
   const name = state.featureName;
   const oopsCount = state.oopsCount;
+
+  // Save session to history before clearing state
+  appendSession({
+    featureName: name,
+    sessionId: state.sessionId,
+    startedAt: state.startedAt ?? state.metadata.created,
+    completedAt: new Date().toISOString(),
+    oopsCount,
+    testResults: { ...state.testResults },
+  });
 
   updateState((s) => ({
     ...s,

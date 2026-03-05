@@ -85,7 +85,7 @@ function main(): void {
   try {
     const output = execSync(config.testCommand, {
       encoding: 'utf-8',
-      timeout: 60000,
+      timeout: config.testTimeout ?? 60000,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 

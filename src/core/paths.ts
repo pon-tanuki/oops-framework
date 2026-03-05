@@ -12,3 +12,4 @@ export const STATE_FILE = join(OOPS_DIR, 'state.json');
 export const CONFIG_FILE = join(OOPS_DIR, 'config.json');
 export const LOCK_FILE = join(OOPS_DIR, 'state.lock');
 export const PLAN_FILE = join(OOPS_DIR, 'plan.json');
+export const HISTORY_FILE = join(OOPS_DIR, 'history.json');

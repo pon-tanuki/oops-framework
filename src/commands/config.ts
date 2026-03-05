@@ -13,6 +13,7 @@ export function showConfig(): void {
   // Show env var overrides
   const envOverrides: string[] = [];
   if (process.env.OOPS_TEST_COMMAND) envOverrides.push('OOPS_TEST_COMMAND');
+  if (process.env.OOPS_TEST_TIMEOUT) envOverrides.push('OOPS_TEST_TIMEOUT');
   if (process.env.OOPS_DEBUG) envOverrides.push('OOPS_DEBUG');
   if (process.env.OOPS_NO_COLOR) envOverrides.push('OOPS_NO_COLOR');
   if (process.env.OOPS_DATA_DIR) envOverrides.push('OOPS_DATA_DIR');
@@ -25,8 +26,10 @@ export function showConfig(): void {
   console.log(`  testCommand:          ${chalk.cyan(config.testCommand)}`);
   console.log(`  testFilePattern:      ${chalk.cyan(config.testFilePattern)}`);
   console.log(`  debug:                ${config.debug ? chalk.yellow('true') : chalk.gray('false')}`);
+  console.log(`  testTimeout:          ${chalk.cyan(String(config.testTimeout ?? 60000) + 'ms')}`);
   console.log(`  autoGateCheck:        ${config.features.autoGateCheck ? chalk.green('true') : chalk.gray('false')}`);
   console.log(`  postToolUseTestRunner: ${config.features.postToolUseTestRunner ? chalk.green('true') : chalk.gray('false')}`);
+  console.log(`  excludePatterns:      ${chalk.cyan((config.excludePatterns ?? []).join(', '))}`);
   console.log();
 }
 
@@ -46,11 +49,20 @@ export function setConfig(key: string, value: string): void {
     case 'autoGateCheck':
       config.features.autoGateCheck = parseBool(value, key);
       break;
+    case 'testTimeout': {
+      const ms = parseInt(value, 10);
+      if (isNaN(ms) || ms <= 0) throw new CliError('"testTimeout" must be a positive integer (ms).');
+      config.testTimeout = ms;
+      break;
+    }
     case 'postToolUseTestRunner':
       config.features.postToolUseTestRunner = parseBool(value, key);
       break;
+    case 'excludePatterns':
+      config.excludePatterns = value.split(',').map((p) => p.trim());
+      break;
     default:
-      throw new CliError(`Unknown config key "${key}".\n  Available: testCommand, testFilePattern, debug, autoGateCheck, postToolUseTestRunner`);
+      throw new CliError(`Unknown config key "${key}".\n  Available: testCommand, testFilePattern, testTimeout, debug, autoGateCheck, postToolUseTestRunner, excludePatterns`);
   }
 
   writeConfig(config);
