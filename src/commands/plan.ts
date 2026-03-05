@@ -96,8 +96,10 @@ export function nextSubtask(): void {
     return;
   }
 
-  // Mark as in_progress
-  const updated = updateSubtask(next.id, (s) => ({ ...s, status: 'in_progress' }));
+  // Mark subtask as in_progress and update plan state in a single write
+  const updated = readPlan();
+  const idx = updated.subtasks.findIndex((s) => s.id === next.id);
+  updated.subtasks[idx] = { ...updated.subtasks[idx], status: 'in_progress' };
   updated.status = 'in_progress';
   updated.currentSubtask = next.id;
   writePlan(updated);
@@ -129,8 +131,10 @@ export function doneSubtask(): void {
   // Complete the feature first
   completeFeature();
 
-  // Mark subtask as completed
-  const updated = updateSubtask(current.id, (s) => ({ ...s, status: 'completed' }));
+  // Mark subtask as completed and clear current in a single write
+  const updated = readPlan();
+  const idx = updated.subtasks.findIndex((s) => s.id === current.id);
+  updated.subtasks[idx] = { ...updated.subtasks[idx], status: 'completed' };
   updated.currentSubtask = null;
   writePlan(updated);
 
