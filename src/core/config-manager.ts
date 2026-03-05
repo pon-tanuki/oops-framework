@@ -9,8 +9,13 @@ export function readConfig(): OopsConfig {
   if (!existsSync(CONFIG_FILE)) {
     return { ...DEFAULT_CONFIG };
   }
-  const raw = readFileSync(CONFIG_FILE, 'utf-8');
-  return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+  try {
+    const raw = readFileSync(CONFIG_FILE, 'utf-8');
+    return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+  } catch (err) {
+    process.stderr.write(`Warning: Failed to parse ${CONFIG_FILE}, using defaults: ${err instanceof Error ? err.message : String(err)}\n`);
+    return { ...DEFAULT_CONFIG };
+  }
 }
 
 export function writeConfig(config: OopsConfig): void {

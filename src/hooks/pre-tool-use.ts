@@ -7,50 +7,13 @@
  * Output JSON with permissionDecision to stdout.
  */
 
-import { readFileSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-
-// --- Types ---
-
-interface HookInput {
-  tool_name: string;
-  tool_input: {
-    file_path?: string;
-    command?: string;
-    [key: string]: unknown;
-  };
-}
-
-interface HookOutput {
-  hookSpecificOutput: {
-    hookEventName: string;
-    permissionDecision: 'allow' | 'deny' | 'ask';
-    permissionDecisionReason?: string;
-  };
-}
-
-type Phase = 'NONE' | 'RED' | 'GREEN' | 'REFACTOR';
-
-interface OopsState {
-  phase: Phase;
-  oopsCount: number;
-  lastOops: string | null;
-  metadata: {
-    lastUpdate: string;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
+import { readFileSync, existsSync } from 'node:fs';
+import { type HookOutput, type Phase, WRITE_TOOLS, isTestFile } from '../types.js';
+import { readState, updateState } from '../core/state-manager.js';
 
 // --- Config ---
 
 const STATE_FILE = '.oops/state.json';
-const LOCK_FILE = '.oops/state.lock';
-const LOCK_TIMEOUT_MS = 3000;
-const STALE_LOCK_AGE_S = 5;
-const WRITE_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit']);
-const TEST_FILE_PATTERN = /\.test\.|\.spec\.|\/test\/|\/tests\/|\/spec\/|\/__tests__\//;
 
 // --- Helpers ---
 
@@ -75,57 +38,20 @@ function allow(reason?: string): never {
   process.exit(0);
 }
 
-function isTestFile(filePath: string): boolean {
-  const normalized = filePath.replace(/^\.\//, '');
-  return TEST_FILE_PATTERN.test(normalized);
-}
-
-// --- Lock ---
-
-function acquireLock(): void {
-  const start = Date.now();
-  while (existsSync(LOCK_FILE) && Date.now() - start < LOCK_TIMEOUT_MS) {
-    const stat = statSync(LOCK_FILE, { throwIfNoEntry: false });
-    if (stat) {
-      const ageS = (Date.now() - stat.mtimeMs) / 1000;
-      if (ageS > STALE_LOCK_AGE_S) {
-        unlinkSync(LOCK_FILE);
-        break;
-      }
-    }
-    // Brief busy wait
-    const waitUntil = Date.now() + 50;
-    while (Date.now() < waitUntil) { /* spin */ }
-  }
-  if (existsSync(LOCK_FILE)) {
-    deny('Concurrent operation detected. Lock timeout.');
-  }
-  writeFileSync(LOCK_FILE, `${process.pid}:${Date.now()}`);
-}
-
-function releaseLock(): void {
-  if (existsSync(LOCK_FILE)) unlinkSync(LOCK_FILE);
-}
-
 // --- Oops Counter ---
 
 function incrementOops(reason: string, filePath: string): void {
-  acquireLock();
   try {
-    const state: OopsState = JSON.parse(readFileSync(STATE_FILE, 'utf-8'));
-    state.oopsCount += 1;
-    state.lastOops = new Date().toISOString();
-    state.metadata.lastUpdate = new Date().toISOString();
-
-    const tempFile = join(tmpdir(), `oops-state-${process.pid}.json`);
-    writeFileSync(tempFile, JSON.stringify(state, null, 2) + '\n');
-    const content = readFileSync(tempFile, 'utf-8');
-    writeFileSync(STATE_FILE, content);
-    unlinkSync(tempFile);
-
+    updateState((state) => ({
+      ...state,
+      oopsCount: state.oopsCount + 1,
+      lastOops: new Date().toISOString(),
+    }));
+    const state = readState();
     process.stderr.write(`🚫 Oops #${state.oopsCount}: ${reason}\n   File: ${filePath}\n`);
-  } finally {
-    releaseLock();
+  } catch (err) {
+    // Lock failure should not prevent the deny response
+    process.stderr.write(`🚫 Oops: ${reason}\n   File: ${filePath}\n`);
   }
 }
 
@@ -140,7 +66,7 @@ function main(): void {
     deny('Failed to read stdin');
   }
 
-  let input: HookInput;
+  let input: { tool_name?: string; tool_input?: { file_path?: string } };
   try {
     input = JSON.parse(rawInput);
   } catch {
@@ -161,14 +87,13 @@ function main(): void {
   }
 
   // Read phase
-  let state: OopsState;
+  let phase: Phase;
   try {
-    state = JSON.parse(readFileSync(STATE_FILE, 'utf-8'));
+    const state = readState();
+    phase = state.phase ?? 'NONE';
   } catch {
     deny('Failed to read state.json');
   }
-
-  const phase: Phase = state.phase ?? 'NONE';
 
   // NONE phase - unrestricted
   if (phase === 'NONE') {

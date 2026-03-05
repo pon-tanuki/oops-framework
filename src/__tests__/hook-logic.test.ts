@@ -1,12 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-
-// Test the hook's file detection logic
-const TEST_FILE_PATTERN = /\.test\.|\.spec\.|\/test\/|\/tests\/|\/spec\/|\/__tests__\//;
-
-function isTestFile(filePath: string): boolean {
-  return TEST_FILE_PATTERN.test(filePath.replace(/^\.\//, ''));
-}
+import { isTestFile, WRITE_TOOLS } from '../types.js';
 
 describe('Test file detection', () => {
   it('should detect .test. files', () => {
@@ -53,8 +47,6 @@ describe('Test file detection', () => {
 });
 
 describe('Phase rules', () => {
-  const WRITE_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit']);
-
   it('should intercept Edit, Write, NotebookEdit', () => {
     assert.equal(WRITE_TOOLS.has('Edit'), true);
     assert.equal(WRITE_TOOLS.has('Write'), true);

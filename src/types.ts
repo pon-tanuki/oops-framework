@@ -1,11 +1,38 @@
 export type Phase = 'NONE' | 'RED' | 'GREEN' | 'REFACTOR';
 
+// --- Hook types (shared between pre-tool-use and post-tool-use) ---
+
+export interface HookInput {
+  tool_name: string;
+  tool_input: {
+    file_path?: string;
+    command?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface HookOutput {
+  hookSpecificOutput: {
+    hookEventName: string;
+    permissionDecision: 'allow' | 'deny' | 'ask';
+    permissionDecisionReason?: string;
+  };
+}
+
+export const WRITE_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit']);
+export const TEST_FILE_PATTERN = /\.test\.|\.spec\.|\/test\/|\/tests\/|\/spec\/|\/__tests__\//;
+
+export function isTestFile(filePath: string): boolean {
+  const normalized = filePath.replace(/^\.\//, '');
+  return TEST_FILE_PATTERN.test(normalized);
+}
+
 export interface OopsState {
   $schema?: string;
   phase: Phase;
   sessionId: string;
-  orchestratorId: string;
-  locked: boolean;
+  orchestratorId?: string;
+  locked?: boolean;
   oopsCount: number;
   lastOops: string | null;
   testResults: {
@@ -56,8 +83,6 @@ export const VALID_TRANSITIONS: Record<Phase, Phase[]> = {
 export const DEFAULT_STATE: OopsState = {
   phase: 'NONE',
   sessionId: '',
-  orchestratorId: '',
-  locked: false,
   oopsCount: 0,
   lastOops: null,
   testResults: { passed: 0, failed: 0, total: 0 },

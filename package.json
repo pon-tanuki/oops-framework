@@ -1,6 +1,6 @@
 {
   "name": "oops-framework",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "OOPS Framework - TDD enforcement for LLM-driven development via Claude Code Hooks",
   "type": "module",
   "license": "MIT",
@@ -28,8 +28,7 @@
   ],
   "scripts": {
     "oops": "tsx src/cli/index.ts",
-    "test": "npx tsx --test src/__tests__/*.test.ts",
-    "test:demo": "jest test-files/"
+    "test": "npx tsx --test src/__tests__/*.test.ts"
   },
   "dependencies": {
     "chalk": "^5.4.0",
@@ -38,7 +37,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "jest": "^30.2.0",
     "typescript": "^5.7.0"
   }
 }

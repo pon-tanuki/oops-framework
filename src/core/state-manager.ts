@@ -49,8 +49,13 @@ export function readState(): OopsState {
   if (!existsSync(STATE_FILE)) {
     return { ...DEFAULT_STATE };
   }
-  const raw = readFileSync(STATE_FILE, 'utf-8');
-  return JSON.parse(raw) as OopsState;
+  try {
+    const raw = readFileSync(STATE_FILE, 'utf-8');
+    return JSON.parse(raw) as OopsState;
+  } catch (err) {
+    process.stderr.write(`Warning: Failed to parse ${STATE_FILE}, using defaults: ${err instanceof Error ? err.message : String(err)}\n`);
+    return { ...DEFAULT_STATE };
+  }
 }
 
 export function writeState(state: OopsState): void {

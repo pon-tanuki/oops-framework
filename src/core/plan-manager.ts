@@ -20,8 +20,12 @@ export function readPlan(): OopsPlan {
   if (!existsSync(PLAN_FILE)) {
     throw new Error('No plan found. Run `oops plan create` first.');
   }
-  const raw = readFileSync(PLAN_FILE, 'utf-8');
-  return JSON.parse(raw) as OopsPlan;
+  try {
+    const raw = readFileSync(PLAN_FILE, 'utf-8');
+    return JSON.parse(raw) as OopsPlan;
+  } catch (err) {
+    throw new Error(`Failed to parse ${PLAN_FILE}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 export function writePlan(plan: OopsPlan): void {

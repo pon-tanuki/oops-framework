@@ -14,12 +14,21 @@ export function runTests(): TestResult {
     });
     return { exitCode: 0, passed: true, output };
   } catch (err: unknown) {
-    const execErr = err as { status?: number; stdout?: string; stderr?: string };
-    const output = (execErr.stdout ?? '') + (execErr.stderr ?? '');
+    if (err && typeof err === 'object') {
+      const execErr = err as Record<string, unknown>;
+      const stdout = typeof execErr.stdout === 'string' ? execErr.stdout : '';
+      const stderr = typeof execErr.stderr === 'string' ? execErr.stderr : '';
+      const status = typeof execErr.status === 'number' ? execErr.status : 1;
+      return {
+        exitCode: status,
+        passed: false,
+        output: stdout + stderr,
+      };
+    }
     return {
-      exitCode: execErr.status ?? 1,
+      exitCode: 1,
       passed: false,
-      output,
+      output: err instanceof Error ? err.message : String(err),
     };
   }
 }

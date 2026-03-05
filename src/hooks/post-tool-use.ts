@@ -10,61 +10,15 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-
-// --- Types ---
-
-interface HookInput {
-  tool_name: string;
-  tool_input: {
-    file_path?: string;
-    command?: string;
-    [key: string]: unknown;
-  };
-}
-
-interface OopsConfig {
-  testCommand: string;
-  features: {
-    postToolUseTestRunner: boolean;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
-
-interface OopsState {
-  phase: string;
-  [key: string]: unknown;
-}
+import { WRITE_TOOLS, isTestFile } from '../types.js';
+import { readConfig } from '../core/config-manager.js';
+import { readState } from '../core/state-manager.js';
+import { extractTestSummary } from '../core/gate-checker.js';
 
 // --- Config ---
 
 const STATE_FILE = '.oops/state.json';
 const CONFIG_FILE = '.oops/config.json';
-const WRITE_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit']);
-const TEST_FILE_PATTERN = /\.test\.|\.spec\.|\/test\/|\/tests\/|\/spec\/|\/__tests__\//;
-
-// --- Helpers ---
-
-function isTestFile(filePath: string): boolean {
-  const normalized = filePath.replace(/^\.\//, '');
-  return TEST_FILE_PATTERN.test(normalized);
-}
-
-function readConfig(): OopsConfig | null {
-  try {
-    return JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
-  } catch {
-    return null;
-  }
-}
-
-function readState(): OopsState | null {
-  try {
-    return JSON.parse(readFileSync(STATE_FILE, 'utf-8'));
-  } catch {
-    return null;
-  }
-}
 
 // --- Main ---
 
@@ -77,7 +31,7 @@ function main(): void {
     return; // Silently exit if no stdin
   }
 
-  let input: HookInput;
+  let input: { tool_name?: string; tool_input?: { file_path?: string } };
   try {
     input = JSON.parse(rawInput);
   } catch {
@@ -95,11 +49,11 @@ function main(): void {
 
   // Check feature flag
   const config = readConfig();
-  if (!config?.features?.postToolUseTestRunner) return;
+  if (!config.features.postToolUseTestRunner) return;
 
   // Check we're in an active phase
   const state = readState();
-  if (!state || state.phase === 'NONE') return;
+  if (state.phase === 'NONE') return;
 
   // Determine what kind of file was modified
   const testFile = isTestFile(filePath);
@@ -185,29 +139,6 @@ function main(): void {
         break;
     }
   }
-}
-
-function extractTestSummary(output: string): string {
-  // Try to extract Jest/node:test summary lines
-  const lines = output.split('\n');
-  const summaryLines = lines.filter(
-    (line) =>
-      /Tests?:/.test(line) ||
-      /Suites?:/.test(line) ||
-      /pass/i.test(line) ||
-      /fail/i.test(line) ||
-      /^\s*\d+ (passing|failing|pending)/.test(line)
-  );
-
-  if (summaryLines.length > 0) {
-    return summaryLines.slice(0, 3).join(' | ').trim();
-  }
-
-  // Fallback: last non-empty line
-  const lastLine = lines
-    .filter((l) => l.trim().length > 0)
-    .pop();
-  return lastLine?.trim() ?? 'No output';
 }
 
 // Fail-safe: catch all errors and silently exit

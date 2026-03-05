@@ -28,7 +28,7 @@ const program = new Command();
 program
   .name('oops')
   .description('OOPS Framework - No more "Oops, I broke it again!"')
-  .version('0.3.0');
+  .version('0.4.0');
 
 // oops init
 program
