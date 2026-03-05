@@ -5,6 +5,15 @@ import { startFeature, showFeatureStatus, completeFeature } from '../commands/fe
 import { runGateCheck } from '../commands/gate.js';
 import { showStats } from '../commands/stats.js';
 import { initOops } from '../commands/init.js';
+import {
+  createPlanCommand,
+  showPlan,
+  nextSubtask,
+  doneSubtask,
+  completePlan,
+  skipSubtask,
+  addSubtaskCommand,
+} from '../commands/plan.js';
 
 const program = new Command();
 
@@ -65,5 +74,48 @@ program
   .command('stats')
   .description('Show OOPS statistics')
   .action(() => showStats());
+
+// oops plan <action>
+const plan = program
+  .command('plan')
+  .description('Manage task decomposition plans');
+
+plan
+  .command('create')
+  .description('Create a new plan with subtasks')
+  .requiredOption('--goal <goal>', 'The goal of the plan')
+  .option('--subtask <subtasks...>', 'Subtasks in "name: description" format')
+  .action((options) => createPlanCommand(options.goal, options.subtask || []));
+
+plan
+  .command('show')
+  .description('Show the current plan')
+  .action(() => showPlan());
+
+plan
+  .command('next')
+  .description('Start the next pending subtask')
+  .action(() => nextSubtask());
+
+plan
+  .command('done')
+  .description('Complete the current subtask')
+  .action(() => doneSubtask());
+
+plan
+  .command('complete')
+  .description('Mark the entire plan as completed')
+  .action(() => completePlan());
+
+plan
+  .command('skip <id>')
+  .description('Skip a subtask by ID')
+  .action((id) => skipSubtask(id));
+
+plan
+  .command('add')
+  .description('Add a subtask to the existing plan')
+  .requiredOption('--subtask <subtask>', 'Subtask in "name: description" format')
+  .action((options) => addSubtaskCommand(options.subtask));
 
 program.parse();
