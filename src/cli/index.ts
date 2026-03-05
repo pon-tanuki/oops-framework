@@ -1,5 +1,9 @@
 #!/usr/bin/env npx tsx
 import { Command } from 'commander';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { showPhase, setPhase } from '../commands/phase.js';
 import { startFeature, showFeatureStatus, completeFeature } from '../commands/feature.js';
 import { runGateCheck } from '../commands/gate.js';
@@ -14,6 +18,10 @@ import {
   skipSubtask,
   addSubtaskCommand,
 } from '../commands/plan.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+export const PACKAGE_ROOT = join(__dirname, '..', '..');
 
 const program = new Command();
 
@@ -117,5 +125,45 @@ plan
   .description('Add a subtask to the existing plan')
   .requiredOption('--subtask <subtask>', 'Subtask in "name: description" format')
   .action((options) => addSubtaskCommand(options.subtask));
+
+// oops hook-pre (internal: called by Claude Code PreToolUse hook)
+program
+  .command('hook-pre')
+  .description('Run PreToolUse hook (internal)')
+  .action(() => {
+    const hookScript = join(PACKAGE_ROOT, 'src', 'hooks', 'pre-tool-use.ts');
+    const stdin = readFileSync(0, 'utf-8');
+    try {
+      const result = execFileSync('npx', ['tsx', hookScript], {
+        input: stdin,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      process.stdout.write(result);
+    } catch (err: unknown) {
+      const execErr = err as { stdout?: string; stderr?: string };
+      if (execErr.stdout) process.stdout.write(execErr.stdout);
+      if (execErr.stderr) process.stderr.write(execErr.stderr);
+    }
+  });
+
+// oops hook-post (internal: called by Claude Code PostToolUse hook)
+program
+  .command('hook-post')
+  .description('Run PostToolUse hook (internal)')
+  .action(() => {
+    const hookScript = join(PACKAGE_ROOT, 'src', 'hooks', 'post-tool-use.ts');
+    const stdin = readFileSync(0, 'utf-8');
+    try {
+      execFileSync('npx', ['tsx', hookScript], {
+        input: stdin,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'inherit'],
+      });
+    } catch (err: unknown) {
+      const execErr = err as { stderr?: string };
+      if (execErr.stderr) process.stderr.write(execErr.stderr);
+    }
+  });
 
 program.parse();
