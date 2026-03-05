@@ -1,12 +1,31 @@
 {
   "name": "oops-framework",
   "version": "0.1.0",
-  "private": true,
-  "description": "OOPS Framework - No more 'Oops, I broke it again!'",
+  "description": "OOPS Framework - TDD enforcement for LLM-driven development via Claude Code Hooks",
   "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "tdd",
+    "claude",
+    "claude-code",
+    "hooks",
+    "llm",
+    "ai",
+    "testing",
+    "red-green-refactor"
+  ],
   "bin": {
     "oops": "./bin/oops"
   },
+  "files": [
+    "bin/",
+    "src/",
+    ".claude/hooks/",
+    ".claude/skills/",
+    ".oops/config.json",
+    ".oops/README.md",
+    "tsconfig.json"
+  ],
   "scripts": {
     "oops": "tsx src/cli/index.ts",
     "test": "jest test-files/",
@@ -14,12 +33,12 @@
   },
   "dependencies": {
     "chalk": "^5.4.0",
-    "commander": "^13.1.0"
+    "commander": "^13.1.0",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "jest": "^30.2.0",
-    "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   }
 }
