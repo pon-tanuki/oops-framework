@@ -8,8 +8,9 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
-import { type HookOutput, type Phase, WRITE_TOOLS, isTestFile } from '../types.js';
+import { type HookOutput, type Phase, WRITE_TOOLS, isTestFile, isExcludedFile } from '../types.js';
 import { readState, updateState } from '../core/state-manager.js';
+import { readConfig } from '../core/config-manager.js';
 import { STATE_FILE } from '../core/paths.js';
 
 // --- Helpers ---
@@ -95,6 +96,12 @@ function main(): void {
   // NONE phase - unrestricted
   if (phase === 'NONE') {
     allow('Phase: NONE (unrestricted)');
+  }
+
+  // Excluded files are always allowed (config files, docs, etc.)
+  const config = readConfig();
+  if (isExcludedFile(filePath, config.excludePatterns ?? [])) {
+    allow(`Excluded file: ${filePath}`);
   }
 
   const testFile = isTestFile(filePath);

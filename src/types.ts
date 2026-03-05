@@ -27,6 +27,21 @@ export function isTestFile(filePath: string): boolean {
   return TEST_FILE_PATTERN.test(normalized);
 }
 
+export function isExcludedFile(filePath: string, patterns: string[]): boolean {
+  const normalized = filePath.replace(/^\.\//, '');
+  const basename = normalized.split('/').pop() ?? '';
+  return patterns.some((pattern) => {
+    if (pattern.endsWith('/**')) {
+      const dir = pattern.slice(0, -3);
+      return normalized.startsWith(dir + '/') || normalized === dir;
+    }
+    if (pattern.startsWith('*.')) {
+      return basename.endsWith(pattern.slice(1));
+    }
+    return basename === pattern || normalized === pattern;
+  });
+}
+
 export interface OopsState {
   $schema?: string;
   phase: Phase;
@@ -53,7 +68,9 @@ export interface OopsConfig {
   version: string;
   testCommand: string;
   testFilePattern: string;
+  testTimeout: number;
   debug: boolean;
+  excludePatterns: string[];
   features: {
     autoGateCheck: boolean;
     postToolUseTestRunner: boolean;
@@ -97,7 +114,19 @@ export const DEFAULT_CONFIG: OopsConfig = {
   version: '1.0.0',
   testCommand: 'npm test',
   testFilePattern: '\\.test\\.|.spec\\.|/test/|/tests/|/spec/|/__tests__/',
+  testTimeout: 60000,
   debug: false,
+  excludePatterns: [
+    '*.md',
+    '*.yml',
+    '*.yaml',
+    'package.json',
+    'package-lock.json',
+    'tsconfig.json',
+    '.github/**',
+    '.oops/**',
+    '.claude/**',
+  ],
   features: {
     autoGateCheck: true,
     postToolUseTestRunner: false,
@@ -124,6 +153,21 @@ export interface OopsPlan {
   status: PlanStatus;
   currentSubtask: number | null;
   subtasks: Subtask[];
+}
+
+// --- Session history types ---
+
+export interface CompletedSession {
+  featureName: string;
+  sessionId: string;
+  startedAt: string;
+  completedAt: string;
+  oopsCount: number;
+  testResults: {
+    passed: number;
+    failed: number;
+    total: number;
+  };
 }
 
 export const DEFAULT_PLAN: OopsPlan = {

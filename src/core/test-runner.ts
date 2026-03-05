@@ -9,7 +9,7 @@ export function runTests(): TestResult {
   try {
     const output = execSync(cmd, {
       encoding: 'utf-8',
-      timeout: 60000,
+      timeout: config.testTimeout ?? 60000,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     return { exitCode: 0, passed: true, output };

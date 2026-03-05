@@ -6,6 +6,7 @@ import { logger } from './logger.js';
 /**
  * Environment variable overrides (highest priority):
  *   OOPS_TEST_COMMAND  - Override testCommand
+ *   OOPS_TEST_TIMEOUT   - Override test timeout in ms
  *   OOPS_DEBUG         - Enable debug mode (true/1)
  *   OOPS_NO_COLOR      - Disable colored output (true/1)
  *   OOPS_DATA_DIR      - Override .oops directory (handled in paths.ts)
@@ -15,6 +16,13 @@ function applyEnvOverrides(config: OopsConfig): OopsConfig {
 
   if (process.env.OOPS_TEST_COMMAND) {
     result.testCommand = process.env.OOPS_TEST_COMMAND;
+  }
+
+  if (process.env.OOPS_TEST_TIMEOUT) {
+    const timeout = parseInt(process.env.OOPS_TEST_TIMEOUT, 10);
+    if (!isNaN(timeout) && timeout > 0) {
+      result.testTimeout = timeout;
+    }
   }
 
   if (process.env.OOPS_DEBUG === 'true' || process.env.OOPS_DEBUG === '1') {
