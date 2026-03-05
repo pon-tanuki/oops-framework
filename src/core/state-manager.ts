@@ -2,10 +2,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync, statSync, mkdirSyn
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { type OopsState, DEFAULT_STATE } from '../types.js';
-
-const OOPS_DIR = '.oops';
-const STATE_FILE = join(OOPS_DIR, 'state.json');
-const LOCK_FILE = join(OOPS_DIR, 'state.lock');
+import { OOPS_DIR, STATE_FILE, LOCK_FILE } from './paths.js';
 const LOCK_TIMEOUT_MS = 3000;
 const STALE_LOCK_AGE_S = 5;
 

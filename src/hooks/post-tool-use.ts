@@ -14,11 +14,7 @@ import { WRITE_TOOLS, isTestFile } from '../types.js';
 import { readConfig } from '../core/config-manager.js';
 import { readState } from '../core/state-manager.js';
 import { extractTestSummary } from '../core/gate-checker.js';
-
-// --- Config ---
-
-const STATE_FILE = '.oops/state.json';
-const CONFIG_FILE = '.oops/config.json';
+import { STATE_FILE, CONFIG_FILE } from '../core/paths.js';
 
 // --- Main ---
 

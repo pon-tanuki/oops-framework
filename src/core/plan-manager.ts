@@ -2,9 +2,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from '
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { type OopsPlan, type Subtask, type SubtaskStatus, DEFAULT_PLAN } from '../types.js';
-
-const OOPS_DIR = '.oops';
-const PLAN_FILE = join(OOPS_DIR, 'plan.json');
+import { OOPS_DIR, PLAN_FILE } from './paths.js';
 
 function ensureOopsDir(): void {
   if (!existsSync(OOPS_DIR)) {

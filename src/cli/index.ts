@@ -4,11 +4,13 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import chalk from 'chalk';
 import { showPhase, setPhase } from '../commands/phase.js';
 import { startFeature, showFeatureStatus, completeFeature } from '../commands/feature.js';
 import { runGateCheck } from '../commands/gate.js';
 import { showStats } from '../commands/stats.js';
 import { initOops } from '../commands/init.js';
+import { showConfig, setConfig, resetConfig } from '../commands/config.js';
 import {
   createPlanCommand,
   showPlan,
@@ -18,6 +20,7 @@ import {
   skipSubtask,
   addSubtaskCommand,
 } from '../commands/plan.js';
+import { setLogLevel, setColorsEnabled, setQuietMode } from '../core/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,18 +31,35 @@ const program = new Command();
 program
   .name('oops')
   .description('OOPS Framework - No more "Oops, I broke it again!"')
-  .version('0.4.0');
+  .version('0.5.0')
+  .option('--debug', 'Enable debug output')
+  .option('--no-color', 'Disable colored output')
+  .option('--quiet', 'Suppress non-error output')
+  .hook('preAction', (_thisCommand, actionCommand) => {
+    const opts = program.opts();
+    if (opts.debug) {
+      setLogLevel('debug');
+    }
+    if (opts.color === false || process.env.OOPS_NO_COLOR === 'true' || process.env.OOPS_NO_COLOR === '1' || process.env.NO_COLOR) {
+      setColorsEnabled(false);
+      chalk.level = 0;
+    }
+    if (opts.quiet) {
+      setQuietMode(true);
+    }
+  });
 
 // oops init
 program
   .command('init')
-  .description('Initialize OOPS Framework')
+  .description('Initialize OOPS Framework in current project')
   .option('--force', 'Overwrite existing files')
   .action((options) => initOops(options));
 
 // oops phase [target]
 program
   .command('phase [target]')
+  .alias('p')
   .description('Show or set the current TDD phase')
   .option('--force', 'Force phase transition')
   .option('--skip-gate', 'Skip gate check')
@@ -54,6 +74,7 @@ program
 // oops feature <action> [name]
 const feature = program
   .command('feature')
+  .alias('f')
   .description('Manage feature development sessions');
 
 feature
@@ -74,14 +95,37 @@ feature
 // oops gate [name]
 program
   .command('gate [name]')
+  .alias('g')
   .description('Run gate check (auto-detects or specify: red-to-green, green-to-refactor)')
   .action((name) => runGateCheck(name));
 
 // oops stats
 program
   .command('stats')
+  .alias('s')
   .description('Show OOPS statistics')
   .action(() => showStats());
+
+// oops config <action>
+const config = program
+  .command('config')
+  .alias('c')
+  .description('View or modify OOPS configuration');
+
+config
+  .command('show')
+  .description('Display current configuration (with env var overrides)')
+  .action(() => showConfig());
+
+config
+  .command('set <key> <value>')
+  .description('Set a configuration value (e.g., testCommand, debug, autoGateCheck)')
+  .action((key, value) => setConfig(key, value));
+
+config
+  .command('reset')
+  .description('Reset configuration to defaults')
+  .action(() => resetConfig());
 
 // oops plan <action>
 const plan = program
