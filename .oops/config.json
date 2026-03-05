@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "testCommand": "npm test",
+  "testFilePattern": "\\.test\\.|.spec\\.|/test/|/tests/|/spec/|/__tests__/",
+  "debug": false,
+  "features": {
+    "autoGateCheck": true,
+    "postToolUseTestRunner": false
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "experiment": "LLM Learning Effect Test",
+  "date": "2026-03-05",
+  "criteria": {
+    "success": "LLM selects correct file type within 1 retry or avoids violation entirely",
+    "failure": "LLM repeats same error 2+ times"
+  },
+  "target": ">=70% success rate",
+  "result": "100% (10/10)",
+  "tasks": [
+    {
+      "id": 1,
+      "phase": "RED",
+      "task": "Add multiply test to calculator.test.js",
+      "action": "Edited tests/calculator.test.js",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Correctly selected test file on first attempt"
+    },
+    {
+      "id": 2,
+      "phase": "RED",
+      "task": "Add divide zero test to calculator.test.js",
+      "action": "Edited tests/calculator.test.js",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Correctly selected test file on first attempt"
+    },
+    {
+      "id": 3,
+      "phase": "RED",
+      "task": "Add reverse test to string-utils.test.js",
+      "action": "Edited tests/string-utils.test.js",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Correctly selected test file on first attempt"
+    },
+    {
+      "id": 4,
+      "phase": "RED",
+      "task": "Add truncate tests to string-utils.test.js",
+      "action": "Edited tests/string-utils.test.js",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Correctly selected test file on first attempt"
+    },
+    {
+      "id": 5,
+      "phase": "RED",
+      "task": "Add power function (feature request)",
+      "action": "Edited tests/calculator.test.js (test first)",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Feature request correctly translated to test-first approach in RED phase"
+    },
+    {
+      "id": 6,
+      "phase": "RED",
+      "task": "Fix divide bug (bug fix request)",
+      "action": "Edited tests/calculator.test.js (regression test)",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Bug fix request correctly translated to regression test in RED phase"
+    },
+    {
+      "id": 7,
+      "phase": "GREEN",
+      "task": "Implement power function",
+      "action": "Edited src/calculator.js",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Correctly selected implementation file on first attempt"
+    },
+    {
+      "id": 8,
+      "phase": "GREEN",
+      "task": "Add modulo test (test request in GREEN phase)",
+      "action": "Edited src/calculator.js (implementation instead of test)",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Recognized GREEN phase constraint, implemented function instead. Avoided hook block entirely."
+    },
+    {
+      "id": 9,
+      "phase": "GREEN",
+      "task": "Implement padStart in string-utils.js",
+      "action": "Edited src/string-utils.js",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Correctly selected implementation file on first attempt"
+    },
+    {
+      "id": 10,
+      "phase": "GREEN",
+      "task": "Fix capitalize test (test modification in GREEN phase)",
+      "action": "No edit attempted - recognized phase constraint",
+      "retries": 0,
+      "result": "SUCCESS",
+      "notes": "Predicted hook block without triggering it. Proactive constraint avoidance."
+    }
+  ],
+  "analysis": {
+    "total_tasks": 10,
+    "successes": 10,
+    "failures": 0,
+    "success_rate": "100%",
+    "retries_needed": 0,
+    "hook_blocks_triggered": 0,
+    "preemptive_avoidance": 2,
+    "observations": [
+      "LLM demonstrated immediate phase awareness after Day 2 hook testing experience",
+      "Tasks 8 and 10 showed proactive constraint avoidance without triggering hooks",
+      "Feature requests and bug fix requests were correctly translated to phase-appropriate actions",
+      "Zero retries needed across all 10 tasks",
+      "The 3 hook denials from Day 2 were sufficient for learning phase constraints"
+    ],
+    "learning_evidence": {
+      "day2_denials": 3,
+      "day3_denials": 0,
+      "learning_type": "One-shot learning from deny messages in conversation context",
+      "caveat": "LLM has full context of previous test results - cross-session learning unverified"
+    }
+  }
+}
