@@ -10,10 +10,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { type HookOutput, type Phase, WRITE_TOOLS, isTestFile } from '../types.js';
 import { readState, updateState } from '../core/state-manager.js';
-
-// --- Config ---
-
-const STATE_FILE = '.oops/state.json';
+import { STATE_FILE } from '../core/paths.js';
 
 // --- Helpers ---
 
