@@ -1,5 +1,7 @@
 import chalk from 'chalk';
 import { getCurrentPhase, transitionPhase, parsePhase } from '../core/phase-manager.js';
+import { readConfig } from '../core/config-manager.js';
+import { checkGate } from '../core/gate-checker.js';
 import type { Phase } from '../types.js';
 
 const PHASE_COLORS: Record<Phase, (s: string) => string> = {
@@ -16,6 +18,12 @@ const PHASE_EMOJI: Record<Phase, string> = {
   REFACTOR: '🔵',
 };
 
+const GATED_TRANSITIONS: [Phase, Phase][] = [
+  ['RED', 'GREEN'],
+  ['GREEN', 'REFACTOR'],
+  ['REFACTOR', 'RED'],
+];
+
 export function showPhase(): void {
   const phase = getCurrentPhase();
   const color = PHASE_COLORS[phase];
@@ -27,7 +35,31 @@ export function setPhase(target: string, options: { force?: boolean; skipGate?: 
   const to = parsePhase(target);
   const from = getCurrentPhase();
 
-  transitionPhase(to, options);
+  // Run gate check with detailed output before transition
+  const config = readConfig();
+  const shouldGate = config.features.autoGateCheck && !options.force && !options.skipGate;
+  const isGated = GATED_TRANSITIONS.some(([f, t]) => f === from && t === to);
+
+  if (shouldGate && isGated) {
+    const result = checkGate(from, to);
+    if (!result.passed) {
+      console.log(chalk.red(`\n  ❌ Gate check failed: ${from} → ${to}`));
+      console.log(chalk.red(`     ${result.reason}`));
+      if (result.details) {
+        for (const d of result.details) {
+          console.log(chalk.gray(`     ${d}`));
+        }
+      }
+      if (result.testOutput) {
+        console.log(chalk.gray(`\n     Test output:\n     ${result.testOutput.split('\n').join('\n     ')}`));
+      }
+      console.log(chalk.gray(`\n  Use --skip-gate to bypass.`));
+      return;
+    }
+    console.log(chalk.green(`  ✓ Gate check passed`));
+  }
+
+  transitionPhase(to, { ...options, skipGate: true });
   const fromColor = PHASE_COLORS[from];
   const toColor = PHASE_COLORS[to];
   const emoji = PHASE_EMOJI[to];

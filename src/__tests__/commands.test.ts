@@ -128,3 +128,33 @@ describe('showStatus', () => {
     assert.doesNotThrow(() => showStatus());
   });
 });
+
+describe('setPhase with gate integration', () => {
+  before(() => {
+    mkdirSync(OOPS_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+  });
+
+  after(() => {
+    writeTestState({});
+  });
+
+  it('should fail gate check when conditions are not met', async () => {
+    writeTestState({ phase: 'RED', featureName: 'gate-test' });
+    const { setPhase } = await import('../commands/phase.js');
+    // RED→GREEN gate requires failing tests; with no test files, gate should fail
+    // setPhase shows error and returns without throwing after Task 2 changes
+    assert.doesNotThrow(() => setPhase('green', {}));
+    // Phase should remain RED (gate blocked transition)
+    const state = readTestState();
+    assert.equal(state.phase, 'RED');
+  });
+
+  it('should allow transition when --skip-gate is used', async () => {
+    writeTestState({ phase: 'RED', featureName: 'gate-test' });
+    const { setPhase } = await import('../commands/phase.js');
+    assert.doesNotThrow(() => setPhase('green', { skipGate: true }));
+    const state = readTestState();
+    assert.equal(state.phase, 'GREEN');
+  });
+});
