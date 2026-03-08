@@ -36,7 +36,7 @@ const program = new Command();
 program
   .name('oops')
   .description('OOPS Framework - No more "Oops, I broke it again!"')
-  .version('1.1.0')
+  .version('1.2.0')
   .option('--debug', 'Enable debug output')
   .option('--no-color', 'Disable colored output')
   .option('--quiet', 'Suppress non-error output')
@@ -59,6 +59,7 @@ program
   .command('init')
   .description('Initialize OOPS Framework in current project')
   .option('--force', 'Overwrite existing files')
+  .option('--test-command <command>', 'Override test command (default: auto-detect)')
   .action((options) => initOops(options));
 
 // oops phase [target]

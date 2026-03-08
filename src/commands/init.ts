@@ -5,6 +5,7 @@ import { stateExists, writeState } from '../core/state-manager.js';
 import { configExists, writeConfig } from '../core/config-manager.js';
 import { DEFAULT_STATE, DEFAULT_CONFIG } from '../types.js';
 import { PACKAGE_ROOT } from '../cli/index.js';
+import { detectTestCommand } from '../core/project-detector.js';
 
 // --- Hook script content ---
 
@@ -141,7 +142,7 @@ function copySkills(force: boolean): void {
 
 // --- Main ---
 
-export function initOops(options: { force?: boolean } = {}): void {
+export function initOops(options: { force?: boolean; testCommand?: string } = {}): void {
   const force = options.force ?? false;
 
   console.log(chalk.bold('\n🙊 Initializing OOPS Framework'));
@@ -160,8 +161,16 @@ export function initOops(options: { force?: boolean } = {}): void {
   }
 
   if (!configExists() || force) {
-    writeConfig({ ...DEFAULT_CONFIG });
+    const detected = options.testCommand ?? detectTestCommand();
+    const config = { ...DEFAULT_CONFIG };
+    if (detected) {
+      config.testCommand = detected;
+    }
+    writeConfig(config);
     console.log(chalk.green('  ✅ Created .oops/config.json'));
+    if (detected && detected !== DEFAULT_CONFIG.testCommand) {
+      console.log(chalk.cyan(`     Test command auto-detected: ${detected}`));
+    }
   } else {
     console.log(chalk.gray('  ✓ .oops/config.json exists'));
   }
