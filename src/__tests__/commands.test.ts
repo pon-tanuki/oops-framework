@@ -158,3 +158,35 @@ describe('setPhase with gate integration', () => {
     assert.equal(state.phase, 'GREEN');
   });
 });
+
+describe('createPlanCommand', () => {
+  before(() => {
+    mkdirSync(OOPS_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+    writeTestState({});
+  });
+
+  after(() => {
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+  });
+
+  it('should create plan without subtasks', async () => {
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+    const { createPlanCommand } = await import('../commands/plan.js');
+    assert.doesNotThrow(() => createPlanCommand('テスト目標', []));
+    const plan = JSON.parse(readFileSync(PLAN_FILE, 'utf-8'));
+    assert.equal(plan.goal, 'テスト目標');
+    assert.equal(plan.subtasks.length, 0);
+    rmSync(PLAN_FILE);
+  });
+
+  it('should create plan with subtasks', async () => {
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+    const { createPlanCommand } = await import('../commands/plan.js');
+    assert.doesNotThrow(() => createPlanCommand('目標', ['タスク1: 説明1', 'タスク2: 説明2']));
+    const plan = JSON.parse(readFileSync(PLAN_FILE, 'utf-8'));
+    assert.equal(plan.subtasks.length, 2);
+    assert.equal(plan.subtasks[0].name, 'タスク1');
+    rmSync(PLAN_FILE);
+  });
+});

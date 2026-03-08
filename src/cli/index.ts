@@ -197,10 +197,16 @@ plan
   .action((id) => skipSubtask(id));
 
 plan
-  .command('add')
+  .command('add [subtask]')
   .description('Add a subtask to the existing plan')
-  .requiredOption('--subtask <subtask>', 'Subtask in "name: description" format')
-  .action((options) => addSubtaskCommand(options.subtask));
+  .option('--subtask <subtask>', 'Subtask in "name: description" format')
+  .action((subtask, options) => {
+    const arg = subtask ?? options.subtask;
+    if (!arg) {
+      throw new CliError('Subtask argument required. Usage: oops plan add "name: description"');
+    }
+    addSubtaskCommand(arg);
+  });
 
 // oops hook-pre (internal: called by Claude Code PreToolUse hook)
 program
