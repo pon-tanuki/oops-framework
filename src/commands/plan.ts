@@ -37,17 +37,17 @@ export function createPlanCommand(goal: string, subtaskArgs: string[]): void {
     throw new CliError('A plan already exists. Run `oops plan complete` or delete it first.');
   }
 
-  if (subtaskArgs.length === 0) {
-    throw new CliError('At least one subtask is required.');
-  }
-
   const subtaskDefs = subtaskArgs.map(parseSubtaskArg);
   const plan = createPlan(goal, subtaskDefs);
 
   console.log(chalk.bold(`\n\uD83D\uDCCB Plan created: ${chalk.cyan(goal)}`));
-  console.log(`   ${plan.subtasks.length} subtask(s):\n`);
-  for (const st of plan.subtasks) {
-    console.log(`   ${STATUS_ICONS[st.status]} ${st.id}. ${chalk.bold(st.name)}${st.description ? ` - ${st.description}` : ''}`);
+  if (plan.subtasks.length > 0) {
+    console.log(`   ${plan.subtasks.length} subtask(s):\n`);
+    for (const st of plan.subtasks) {
+      console.log(`   ${STATUS_ICONS[st.status]} ${st.id}. ${chalk.bold(st.name)}${st.description ? ` - ${st.description}` : ''}`);
+    }
+  } else {
+    console.log(chalk.gray('   No subtasks yet. Add with: oops plan add "name: description"'));
   }
   console.log('');
 }

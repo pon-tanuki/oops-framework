@@ -36,7 +36,7 @@ const program = new Command();
 program
   .name('oops')
   .description('OOPS Framework - No more "Oops, I broke it again!"')
-  .version('1.1.0')
+  .version('1.2.0')
   .option('--debug', 'Enable debug output')
   .option('--no-color', 'Disable colored output')
   .option('--quiet', 'Suppress non-error output')
@@ -59,6 +59,7 @@ program
   .command('init')
   .description('Initialize OOPS Framework in current project')
   .option('--force', 'Overwrite existing files')
+  .option('--test-command <command>', 'Override test command (default: auto-detect)')
   .action((options) => initOops(options));
 
 // oops phase [target]
@@ -197,10 +198,16 @@ plan
   .action((id) => skipSubtask(id));
 
 plan
-  .command('add')
+  .command('add [subtask]')
   .description('Add a subtask to the existing plan')
-  .requiredOption('--subtask <subtask>', 'Subtask in "name: description" format')
-  .action((options) => addSubtaskCommand(options.subtask));
+  .option('--subtask <subtask>', 'Subtask in "name: description" format')
+  .action((subtask, options) => {
+    const arg = subtask ?? options.subtask;
+    if (!arg) {
+      throw new CliError('Subtask argument required. Usage: oops plan add "name: description"');
+    }
+    addSubtaskCommand(arg);
+  });
 
 // oops hook-pre (internal: called by Claude Code PreToolUse hook)
 program

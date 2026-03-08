@@ -113,6 +113,13 @@ function main(): void {
         allow(`Phase: RED - Test file allowed: ${filePath}`);
       } else {
         incrementOops('Attempted to modify implementation during RED phase', filePath);
+        process.stderr.write(
+          `\n   現在: RED phase（テストファイルのみ編集可）\n` +
+          `   次のステップ:\n` +
+          `     1. テストファイルを作成/編集して失敗するテストを書く\n` +
+          `     2. テストが失敗することを確認\n` +
+          `     3. oops phase green でGREENフェーズへ移行\n`,
+        );
         deny(`🚫 Phase: RED - Only test files allowed. Cannot modify: ${filePath}`);
       }
       break;
@@ -122,6 +129,13 @@ function main(): void {
         allow(`Phase: GREEN - Implementation file allowed: ${filePath}`);
       } else {
         incrementOops('Attempted to modify tests during GREEN phase', filePath);
+        process.stderr.write(
+          `\n   現在: GREEN phase（実装ファイルのみ編集可）\n` +
+          `   次のステップ:\n` +
+          `     1. テストが通る最小限の実装を書く\n` +
+          `     2. テストが全て通ることを確認\n` +
+          `     3. oops phase refactor でREFACTORフェーズへ移行\n`,
+        );
         deny(`🚫 Phase: GREEN - Only implementation files allowed. Cannot modify: ${filePath}`);
       }
       break;

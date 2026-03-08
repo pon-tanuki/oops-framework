@@ -128,3 +128,65 @@ describe('showStatus', () => {
     assert.doesNotThrow(() => showStatus());
   });
 });
+
+describe('setPhase with gate integration', () => {
+  before(() => {
+    mkdirSync(OOPS_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+  });
+
+  after(() => {
+    writeTestState({});
+  });
+
+  it('should fail gate check when conditions are not met', async () => {
+    writeTestState({ phase: 'RED', featureName: 'gate-test' });
+    const { setPhase } = await import('../commands/phase.js');
+    // RED→GREEN gate requires failing tests; with no test files, gate should fail
+    // setPhase shows error and returns without throwing after Task 2 changes
+    assert.doesNotThrow(() => setPhase('green', {}));
+    // Phase should remain RED (gate blocked transition)
+    const state = readTestState();
+    assert.equal(state.phase, 'RED');
+  });
+
+  it('should allow transition when --skip-gate is used', async () => {
+    writeTestState({ phase: 'RED', featureName: 'gate-test' });
+    const { setPhase } = await import('../commands/phase.js');
+    assert.doesNotThrow(() => setPhase('green', { skipGate: true }));
+    const state = readTestState();
+    assert.equal(state.phase, 'GREEN');
+  });
+});
+
+describe('createPlanCommand', () => {
+  before(() => {
+    mkdirSync(OOPS_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+    writeTestState({});
+  });
+
+  after(() => {
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+  });
+
+  it('should create plan without subtasks', async () => {
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+    const { createPlanCommand } = await import('../commands/plan.js');
+    assert.doesNotThrow(() => createPlanCommand('テスト目標', []));
+    const plan = JSON.parse(readFileSync(PLAN_FILE, 'utf-8'));
+    assert.equal(plan.goal, 'テスト目標');
+    assert.equal(plan.subtasks.length, 0);
+    rmSync(PLAN_FILE);
+  });
+
+  it('should create plan with subtasks', async () => {
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+    const { createPlanCommand } = await import('../commands/plan.js');
+    assert.doesNotThrow(() => createPlanCommand('目標', ['タスク1: 説明1', 'タスク2: 説明2']));
+    const plan = JSON.parse(readFileSync(PLAN_FILE, 'utf-8'));
+    assert.equal(plan.subtasks.length, 2);
+    assert.equal(plan.subtasks[0].name, 'タスク1');
+    rmSync(PLAN_FILE);
+  });
+});
