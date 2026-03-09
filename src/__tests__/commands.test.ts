@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEFAULT_STATE, DEFAULT_CONFIG, type OopsState, type OopsPlan, type Subtask } from '../types.js';
+import { resetOops } from '../commands/reset.js';
+import { showStatus } from '../commands/status.js';
+import { setPhase } from '../commands/phase.js';
+import { startFeature, completeFeature } from '../commands/feature.js';
+import { createPlanCommand, nextSubtask, doneSubtask } from '../commands/plan.js';
 
 // We test command logic by manipulating state files directly
 // since commands use the state-manager which reads from .oops/
@@ -36,8 +41,7 @@ describe('resetOops', () => {
     writeTestState({ phase: 'RED', featureName: 'test-feature', oopsCount: 3, sessionId: 'session-abc' });
   });
 
-  it('soft reset should return to NONE phase and preserve oopsCount', async () => {
-    const { resetOops } = await import('../commands/reset.js');
+  it('soft reset should return to NONE phase and preserve oopsCount', () => {
     resetOops();
     const state = readTestState();
     assert.equal(state.phase, 'NONE');
@@ -46,16 +50,14 @@ describe('resetOops', () => {
     assert.equal(state.sessionId, '');
   });
 
-  it('soft reset should be no-op when already in NONE', async () => {
+  it('soft reset should be no-op when already in NONE', () => {
     writeTestState({ phase: 'NONE' });
-    const { resetOops } = await import('../commands/reset.js');
     resetOops(); // should not throw
     const state = readTestState();
     assert.equal(state.phase, 'NONE');
   });
 
-  it('hard reset should wipe all state', async () => {
-    const { resetOops } = await import('../commands/reset.js');
+  it('hard reset should wipe all state', () => {
     resetOops({ hard: true });
     const state = readTestState();
     assert.equal(state.phase, 'NONE');
@@ -63,7 +65,7 @@ describe('resetOops', () => {
     assert.equal(state.sessionId, '');
   });
 
-  it('hard reset should delete active plan', async () => {
+  it('hard reset should delete active plan', () => {
     const plan: OopsPlan = {
       goal: 'test',
       createdAt: new Date().toISOString(),
@@ -74,7 +76,6 @@ describe('resetOops', () => {
     writeFileSync(PLAN_FILE, JSON.stringify(plan, null, 2));
     assert.equal(existsSync(PLAN_FILE), true);
 
-    const { resetOops } = await import('../commands/reset.js');
     resetOops({ hard: true });
     assert.equal(existsSync(PLAN_FILE), false);
   });
@@ -91,19 +92,17 @@ describe('showStatus', () => {
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
   });
 
-  it('should not throw in NONE phase with no feature', async () => {
+  it('should not throw in NONE phase with no feature', () => {
     writeTestState({ phase: 'NONE' });
-    const { showStatus } = await import('../commands/status.js');
     assert.doesNotThrow(() => showStatus());
   });
 
-  it('should not throw in RED phase with active feature', async () => {
+  it('should not throw in RED phase with active feature', () => {
     writeTestState({ phase: 'RED', featureName: 'my-feature', startedAt: new Date().toISOString() });
-    const { showStatus } = await import('../commands/status.js');
     assert.doesNotThrow(() => showStatus());
   });
 
-  it('should not throw when plan exists', async () => {
+  it('should not throw when plan exists', () => {
     writeTestState({ phase: 'RED', featureName: 'my-feature' });
     const plan: OopsPlan = {
       goal: 'Build something',
@@ -116,14 +115,12 @@ describe('showStatus', () => {
       ],
     };
     writeFileSync(PLAN_FILE, JSON.stringify(plan, null, 2));
-    const { showStatus } = await import('../commands/status.js');
     assert.doesNotThrow(() => showStatus());
     rmSync(PLAN_FILE);
   });
 
-  it('should show oops count correctly', async () => {
+  it('should show oops count correctly', () => {
     writeTestState({ phase: 'GREEN', oopsCount: 5, featureName: 'oops-test' });
-    const { showStatus } = await import('../commands/status.js');
     // Just verify it runs without errors
     assert.doesNotThrow(() => showStatus());
   });
@@ -139,9 +136,8 @@ describe('setPhase with gate integration', () => {
     writeTestState({});
   });
 
-  it('should fail gate check when conditions are not met', async () => {
+  it('should fail gate check when conditions are not met', () => {
     writeTestState({ phase: 'RED', featureName: 'gate-test' });
-    const { setPhase } = await import('../commands/phase.js');
     // RED→GREEN gate requires failing tests; with no test files, gate should fail
     // setPhase shows error and returns without throwing after Task 2 changes
     assert.doesNotThrow(() => setPhase('green', {}));
@@ -150,9 +146,8 @@ describe('setPhase with gate integration', () => {
     assert.equal(state.phase, 'RED');
   });
 
-  it('should allow transition when --skip-gate is used', async () => {
+  it('should allow transition when --skip-gate is used', () => {
     writeTestState({ phase: 'RED', featureName: 'gate-test' });
-    const { setPhase } = await import('../commands/phase.js');
     assert.doesNotThrow(() => setPhase('green', { skipGate: true }));
     const state = readTestState();
     assert.equal(state.phase, 'GREEN');
@@ -189,7 +184,7 @@ describe('completeFeature auto-syncs plan subtask', () => {
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
   });
 
-  it('should auto-complete in_progress plan subtask on feature complete', async () => {
+  it('should auto-complete in_progress plan subtask on feature complete', () => {
     writeTestState({ phase: 'REFACTOR', featureName: 'task1', oopsCount: 2, sessionId: 'session-abc' });
     const plan = makePlan({
       currentSubtask: 1,
@@ -200,7 +195,6 @@ describe('completeFeature auto-syncs plan subtask', () => {
     });
     writeTestPlan(plan);
 
-    const { completeFeature } = await import('../commands/feature.js');
     completeFeature();
 
     const updated = readTestPlan();
@@ -211,16 +205,15 @@ describe('completeFeature auto-syncs plan subtask', () => {
     assert.equal(updated.subtasks[1].status, 'pending');
   });
 
-  it('should not modify plan when no plan exists', async () => {
+  it('should not modify plan when no plan exists', () => {
     writeTestState({ phase: 'REFACTOR', featureName: 'solo-task', sessionId: 'session-abc' });
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
 
-    const { completeFeature } = await import('../commands/feature.js');
     assert.doesNotThrow(() => completeFeature());
     assert.equal(existsSync(PLAN_FILE), false);
   });
 
-  it('should not modify plan when no subtask is in_progress', async () => {
+  it('should not modify plan when no subtask is in_progress', () => {
     writeTestState({ phase: 'REFACTOR', featureName: 'solo-task', sessionId: 'session-abc' });
     const plan = makePlan({
       subtasks: [
@@ -229,7 +222,6 @@ describe('completeFeature auto-syncs plan subtask', () => {
     });
     writeTestPlan(plan);
 
-    const { completeFeature } = await import('../commands/feature.js');
     completeFeature();
 
     const updated = readTestPlan();
@@ -248,7 +240,7 @@ describe('doneSubtask records oopsCount correctly', () => {
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
   });
 
-  it('should record session oopsCount in completed subtask', async () => {
+  it('should record session oopsCount in completed subtask', () => {
     writeTestState({ phase: 'REFACTOR', featureName: 'task1', oopsCount: 5, sessionId: 'session-xyz' });
     const plan = makePlan({
       currentSubtask: 1,
@@ -258,7 +250,6 @@ describe('doneSubtask records oopsCount correctly', () => {
     });
     writeTestPlan(plan);
 
-    const { doneSubtask } = await import('../commands/plan.js');
     doneSubtask();
 
     const updated = readTestPlan();
@@ -278,7 +269,7 @@ describe('nextSubtask records startedAt', () => {
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
   });
 
-  it('should set startedAt when starting subtask', async () => {
+  it('should set startedAt when starting subtask', () => {
     writeTestState({ phase: 'NONE' });
     const plan = makePlan({
       subtasks: [
@@ -287,7 +278,6 @@ describe('nextSubtask records startedAt', () => {
     });
     writeTestPlan(plan);
 
-    const { nextSubtask } = await import('../commands/plan.js');
     nextSubtask();
 
     const updated = readTestPlan();
@@ -309,9 +299,8 @@ describe('startFeature with --no-tdd', () => {
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
   });
 
-  it('should start in NONE phase when --no-tdd is set', async () => {
+  it('should start in NONE phase when --no-tdd is set', () => {
     writeTestState({ phase: 'NONE' });
-    const { startFeature } = await import('../commands/feature.js');
     startFeature('docs-task', { noTdd: true });
     const state = readTestState();
     assert.equal(state.phase, 'NONE');
@@ -320,9 +309,8 @@ describe('startFeature with --no-tdd', () => {
     assert.ok(state.sessionId);
   });
 
-  it('should start in RED phase by default', async () => {
+  it('should start in RED phase by default', () => {
     writeTestState({ phase: 'NONE' });
-    const { startFeature } = await import('../commands/feature.js');
     startFeature('normal-task');
     const state = readTestState();
     assert.equal(state.phase, 'RED');
@@ -330,9 +318,8 @@ describe('startFeature with --no-tdd', () => {
     assert.notEqual(state.noTdd, true);
   });
 
-  it('should complete from NONE phase when noTdd is true', async () => {
+  it('should complete from NONE phase when noTdd is true', () => {
     writeTestState({ phase: 'NONE', featureName: 'docs-task', noTdd: true, sessionId: 'session-abc' });
-    const { completeFeature } = await import('../commands/feature.js');
     assert.doesNotThrow(() => completeFeature());
     const state = readTestState();
     assert.equal(state.phase, 'NONE');
@@ -352,9 +339,8 @@ describe('createPlanCommand', () => {
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
   });
 
-  it('should create plan without subtasks', async () => {
+  it('should create plan without subtasks', () => {
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
-    const { createPlanCommand } = await import('../commands/plan.js');
     assert.doesNotThrow(() => createPlanCommand('テスト目標', []));
     const plan = JSON.parse(readFileSync(PLAN_FILE, 'utf-8'));
     assert.equal(plan.goal, 'テスト目標');
@@ -362,9 +348,8 @@ describe('createPlanCommand', () => {
     rmSync(PLAN_FILE);
   });
 
-  it('should create plan with subtasks', async () => {
+  it('should create plan with subtasks', () => {
     if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
-    const { createPlanCommand } = await import('../commands/plan.js');
     assert.doesNotThrow(() => createPlanCommand('目標', ['タスク1: 説明1', 'タスク2: 説明2']));
     const plan = JSON.parse(readFileSync(PLAN_FILE, 'utf-8'));
     assert.equal(plan.subtasks.length, 2);
