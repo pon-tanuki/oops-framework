@@ -2,7 +2,7 @@ import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_STATE, DEFAULT_CONFIG, type OopsState, type OopsPlan } from '../types.js';
+import { DEFAULT_STATE, DEFAULT_CONFIG, type OopsState, type OopsPlan, type Subtask } from '../types.js';
 
 // We test command logic by manipulating state files directly
 // since commands use the state-manager which reads from .oops/
@@ -156,6 +156,188 @@ describe('setPhase with gate integration', () => {
     assert.doesNotThrow(() => setPhase('green', { skipGate: true }));
     const state = readTestState();
     assert.equal(state.phase, 'GREEN');
+  });
+});
+
+function readTestPlan(): OopsPlan {
+  return JSON.parse(readFileSync(PLAN_FILE, 'utf-8'));
+}
+
+function writeTestPlan(plan: OopsPlan): void {
+  writeFileSync(PLAN_FILE, JSON.stringify(plan, null, 2));
+}
+
+function makePlan(overrides: Partial<OopsPlan> = {}): OopsPlan {
+  return {
+    goal: 'Test goal',
+    createdAt: new Date().toISOString(),
+    status: 'in_progress',
+    currentSubtask: null,
+    subtasks: [],
+    ...overrides,
+  };
+}
+
+describe('completeFeature auto-syncs plan subtask', () => {
+  before(() => {
+    mkdirSync(OOPS_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+  });
+
+  after(() => {
+    writeTestState({});
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+  });
+
+  it('should auto-complete in_progress plan subtask on feature complete', async () => {
+    writeTestState({ phase: 'REFACTOR', featureName: 'task1', oopsCount: 2, sessionId: 'session-abc' });
+    const plan = makePlan({
+      currentSubtask: 1,
+      subtasks: [
+        { id: 1, name: 'task1', description: 'desc', status: 'in_progress', oopsCount: 0, cycles: 0 },
+        { id: 2, name: 'task2', description: '', status: 'pending', oopsCount: 0, cycles: 0 },
+      ],
+    });
+    writeTestPlan(plan);
+
+    const { completeFeature } = await import('../commands/feature.js');
+    completeFeature();
+
+    const updated = readTestPlan();
+    assert.equal(updated.subtasks[0].status, 'completed');
+    assert.equal(updated.subtasks[0].oopsCount, 2);
+    assert.ok(updated.subtasks[0].completedAt);
+    assert.equal(updated.currentSubtask, null);
+    assert.equal(updated.subtasks[1].status, 'pending');
+  });
+
+  it('should not modify plan when no plan exists', async () => {
+    writeTestState({ phase: 'REFACTOR', featureName: 'solo-task', sessionId: 'session-abc' });
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+
+    const { completeFeature } = await import('../commands/feature.js');
+    assert.doesNotThrow(() => completeFeature());
+    assert.equal(existsSync(PLAN_FILE), false);
+  });
+
+  it('should not modify plan when no subtask is in_progress', async () => {
+    writeTestState({ phase: 'REFACTOR', featureName: 'solo-task', sessionId: 'session-abc' });
+    const plan = makePlan({
+      subtasks: [
+        { id: 1, name: 'done-task', description: '', status: 'completed', oopsCount: 0, cycles: 0 },
+      ],
+    });
+    writeTestPlan(plan);
+
+    const { completeFeature } = await import('../commands/feature.js');
+    completeFeature();
+
+    const updated = readTestPlan();
+    assert.equal(updated.subtasks[0].status, 'completed');
+  });
+});
+
+describe('doneSubtask records oopsCount correctly', () => {
+  before(() => {
+    mkdirSync(OOPS_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+  });
+
+  after(() => {
+    writeTestState({});
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+  });
+
+  it('should record session oopsCount in completed subtask', async () => {
+    writeTestState({ phase: 'REFACTOR', featureName: 'task1', oopsCount: 5, sessionId: 'session-xyz' });
+    const plan = makePlan({
+      currentSubtask: 1,
+      subtasks: [
+        { id: 1, name: 'task1', description: '', status: 'in_progress', oopsCount: 0, cycles: 0 },
+      ],
+    });
+    writeTestPlan(plan);
+
+    const { doneSubtask } = await import('../commands/plan.js');
+    doneSubtask();
+
+    const updated = readTestPlan();
+    assert.equal(updated.subtasks[0].status, 'completed');
+    assert.equal(updated.subtasks[0].oopsCount, 5);
+  });
+});
+
+describe('nextSubtask records startedAt', () => {
+  before(() => {
+    mkdirSync(OOPS_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+  });
+
+  after(() => {
+    writeTestState({});
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+  });
+
+  it('should set startedAt when starting subtask', async () => {
+    writeTestState({ phase: 'NONE' });
+    const plan = makePlan({
+      subtasks: [
+        { id: 1, name: 'task1', description: 'desc', status: 'pending', oopsCount: 0, cycles: 0 },
+      ],
+    });
+    writeTestPlan(plan);
+
+    const { nextSubtask } = await import('../commands/plan.js');
+    nextSubtask();
+
+    const updated = readTestPlan();
+    assert.equal(updated.subtasks[0].status, 'in_progress');
+    assert.ok(updated.subtasks[0].startedAt);
+    // Verify it's a valid ISO date
+    assert.ok(!isNaN(new Date(updated.subtasks[0].startedAt!).getTime()));
+  });
+});
+
+describe('startFeature with --no-tdd', () => {
+  before(() => {
+    mkdirSync(OOPS_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+  });
+
+  after(() => {
+    writeTestState({});
+    if (existsSync(PLAN_FILE)) rmSync(PLAN_FILE);
+  });
+
+  it('should start in NONE phase when --no-tdd is set', async () => {
+    writeTestState({ phase: 'NONE' });
+    const { startFeature } = await import('../commands/feature.js');
+    startFeature('docs-task', { noTdd: true });
+    const state = readTestState();
+    assert.equal(state.phase, 'NONE');
+    assert.equal(state.featureName, 'docs-task');
+    assert.equal(state.noTdd, true);
+    assert.ok(state.sessionId);
+  });
+
+  it('should start in RED phase by default', async () => {
+    writeTestState({ phase: 'NONE' });
+    const { startFeature } = await import('../commands/feature.js');
+    startFeature('normal-task');
+    const state = readTestState();
+    assert.equal(state.phase, 'RED');
+    assert.equal(state.featureName, 'normal-task');
+    assert.notEqual(state.noTdd, true);
+  });
+
+  it('should complete from NONE phase when noTdd is true', async () => {
+    writeTestState({ phase: 'NONE', featureName: 'docs-task', noTdd: true, sessionId: 'session-abc' });
+    const { completeFeature } = await import('../commands/feature.js');
+    assert.doesNotThrow(() => completeFeature());
+    const state = readTestState();
+    assert.equal(state.phase, 'NONE');
+    assert.equal(state.featureName, undefined);
+    assert.equal(state.noTdd, undefined);
   });
 });
 

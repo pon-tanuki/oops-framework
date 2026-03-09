@@ -36,7 +36,7 @@ const program = new Command();
 program
   .name('oops')
   .description('OOPS Framework - No more "Oops, I broke it again!"')
-  .version('1.2.0')
+  .version('1.3.0')
   .option('--debug', 'Enable debug output')
   .option('--no-color', 'Disable colored output')
   .option('--quiet', 'Suppress non-error output')
@@ -86,7 +86,8 @@ const feature = program
 feature
   .command('start <name>')
   .description('Start a new feature (begins RED phase)')
-  .action((name) => startFeature(name));
+  .option('--no-tdd', 'Skip TDD phases (for docs, config, integration tasks)')
+  .action((name, options) => startFeature(name, { noTdd: options.tdd === false }));
 
 feature
   .command('status')

@@ -145,7 +145,8 @@ oops plan complete  # 🎉 全体完了！
 | `oops phase` | 👀 現在のフェーズを表示 |
 | `oops phase red\|green\|refactor\|none` | 🔀 フェーズを遷移 |
 | `oops feature start <name>` | 🚀 機能開発を開始（→ RED 🔴） |
-| `oops feature complete` | 🎉 機能を完了（→ NONE） |
+| `oops feature start --no-tdd <name>` | 📝 TDDなしで開始（ドキュメント、設定など） |
+| `oops feature complete` | 🎉 機能を完了（planサブタスクも自動同期） |
 | `oops gate` | 🚦 ゲートチェック（遷移条件の確認） |
 | `oops stats` | 📊 統計を表示 |
 | `oops plan create` | 📋 タスク分解計画を作成 |

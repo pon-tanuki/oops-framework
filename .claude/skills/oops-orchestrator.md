@@ -46,6 +46,13 @@ You are managing a TDD session using the OOPS Framework. Follow these rules stri
 ```
 This sets the phase to RED automatically.
 
+### Starting a Non-TDD Task
+ドキュメント作成・統合テスト・設定変更など、TDDサイクルが不適切なタスクには：
+```bash
+./bin/oops feature start --no-tdd <feature-name>
+```
+NONEフェーズのまま作業でき、ファイル編集の制限を受けない。
+
 ### RED Phase
 1. Write test files that describe the desired behavior
 2. Run tests to confirm they FAIL: `npm test`
@@ -72,18 +79,23 @@ This sets the phase to RED automatically.
    ```
 
 ### REFACTOR Phase
-1. Improve code structure, naming, performance
-2. Run tests after EVERY change to ensure they still pass
-3. Do NOT add new functionality
-4. When done, start next cycle:
+1. サブエージェント（Agent tool）を使ってコードレビューを実施する
+   - RED/GREENフェーズで変更したファイルを対象にレビューサブエージェントを起動
+   - リファクタリング候補（命名改善、重複除去、関数分割など）を特定
+2. レビュー結果に基づいてリファクタリングを実施
+3. Run tests after EVERY change to ensure they still pass
+4. Do NOT add new functionality
+5. When done, complete the feature:
    ```bash
-   ./bin/oops phase red
+   ./bin/oops feature complete
    ```
 
 ### Completing a Feature
 ```bash
 ./bin/oops feature complete
 ```
+`feature complete` はplanが存在する場合、in_progressのサブタスクを自動的にcompletedにする。
+`oops plan done` → `oops plan next` の代わりに、`oops feature complete` → `oops plan next` でも同じ動作になる。
 
 ## Key Rules
 - NEVER skip phases. RED → GREEN → REFACTOR → RED
