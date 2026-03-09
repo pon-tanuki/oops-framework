@@ -145,7 +145,8 @@ Every subtask is locked down by the OOPS cycle 🛡️
 | `oops phase` | 👀 Show current phase |
 | `oops phase red\|green\|refactor\|none` | 🔀 Transition phase |
 | `oops feature start <name>` | 🚀 Start feature development (→ RED 🔴) |
-| `oops feature complete` | 🎉 Complete the feature (→ NONE) |
+| `oops feature start --no-tdd <name>` | 📝 Start without TDD (docs, config, etc.) |
+| `oops feature complete` | 🎉 Complete the feature (auto-syncs plan subtask) |
 | `oops gate` | 🚦 Gate check (verify transition conditions) |
 | `oops stats` | 📊 Show statistics |
 | `oops plan create` | 📋 Create a task decomposition plan |

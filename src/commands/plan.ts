@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { startFeature, completeFeature } from './feature.js';
+import { readState } from '../core/state-manager.js';
 import {
   planExists,
   readPlan,
@@ -11,6 +12,7 @@ import {
   addSubtask,
   deletePlan,
 } from '../core/plan-manager.js';
+import { getElapsed, getElapsedBetween } from './status.js';
 import type { SubtaskStatus } from '../types.js';
 import { CliError } from '../core/errors.js';
 
@@ -71,10 +73,22 @@ export function showPlan(): void {
       const icon = STATUS_ICONS[st.status];
       const name = st.status === 'in_progress' ? chalk.yellow(st.name) : st.name;
       const desc = st.description ? chalk.gray(` - ${st.description}`) : '';
-      const stats = st.oopsCount > 0 || st.cycles > 0
-        ? chalk.gray(` (oops: ${st.oopsCount}, cycles: ${st.cycles})`)
-        : '';
-      console.log(`   ${icon} ${st.id}. ${chalk.bold(name)}${desc}${stats}`);
+
+      // Stats (oops, cycles)
+      const statParts: string[] = [];
+      if (st.oopsCount > 0) statParts.push(`oops: ${st.oopsCount}`);
+      if (st.cycles > 0) statParts.push(`cycles: ${st.cycles}`);
+      const stats = statParts.length > 0 ? chalk.gray(` (${statParts.join(', ')})`) : '';
+
+      // Time info
+      let timeInfo = '';
+      if (st.status === 'in_progress' && st.startedAt) {
+        timeInfo = chalk.gray(` [${getElapsed(st.startedAt)}]`);
+      } else if (st.status === 'completed' && st.startedAt && st.completedAt) {
+        timeInfo = chalk.gray(` [${getElapsedBetween(st.startedAt, st.completedAt)}]`);
+      }
+
+      console.log(`   ${icon} ${st.id}. ${chalk.bold(name)}${desc}${stats}${timeInfo}`);
     }
   }
 
@@ -94,13 +108,12 @@ export function nextSubtask(): void {
     return;
   }
 
-  // Mark subtask as in_progress and update plan state in a single write
-  const updated = readPlan();
-  const idx = updated.subtasks.findIndex((s) => s.id === next.id);
-  updated.subtasks[idx] = { ...updated.subtasks[idx], status: 'in_progress' };
-  updated.status = 'in_progress';
-  updated.currentSubtask = next.id;
-  writePlan(updated);
+  // Mark subtask as in_progress and update plan state
+  const idx = plan.subtasks.findIndex((s) => s.id === next.id);
+  plan.subtasks[idx] = { ...plan.subtasks[idx], status: 'in_progress', startedAt: new Date().toISOString() };
+  plan.status = 'in_progress';
+  plan.currentSubtask = next.id;
+  writePlan(plan);
 
   console.log(chalk.bold(`\n\u25B6\uFE0F Starting subtask ${next.id}: ${chalk.cyan(next.name)}`));
   if (next.description) {
@@ -124,25 +137,27 @@ export function doneSubtask(): void {
     throw new CliError('No subtask in progress. Run `oops plan next` first.');
   }
 
-  // Complete the feature first
+  // Capture oopsCount before completeFeature() resets state
+  const state = readState();
+  const sessionOopsCount = state.oopsCount;
+
+  // completeFeature() auto-syncs plan subtask and shows next-subtask hints
   completeFeature();
 
-  // Mark subtask as completed and clear current in a single write
+  // Verify subtask was completed; fallback if auto-sync didn't fire
   const updated = readPlan();
-  const idx = updated.subtasks.findIndex((s) => s.id === current.id);
-  updated.subtasks[idx] = { ...updated.subtasks[idx], status: 'completed' };
-  updated.currentSubtask = null;
-  writePlan(updated);
-
-  console.log(chalk.green(`\n\u2705 Subtask ${current.id} completed: ${chalk.cyan(current.name)}`));
-
-  const next = getNextSubtask(updated);
-  if (next) {
-    console.log(chalk.gray(`   Next up: ${next.id}. ${next.name}`));
-  } else if (isAllCompleted(updated)) {
-    console.log(chalk.green('   All subtasks done! Run `oops plan complete` to finish the plan.'));
+  const completedSubtask = updated.subtasks.find((s) => s.id === current.id);
+  if (completedSubtask && completedSubtask.status !== 'completed') {
+    const idx = updated.subtasks.findIndex((s) => s.id === current.id);
+    updated.subtasks[idx] = {
+      ...updated.subtasks[idx],
+      status: 'completed',
+      oopsCount: sessionOopsCount,
+      completedAt: new Date().toISOString(),
+    };
+    updated.currentSubtask = null;
+    writePlan(updated);
   }
-  console.log('');
 }
 
 export function completePlan(): void {

@@ -26,7 +26,8 @@ export function showStatus(): void {
   console.log('─'.repeat(35));
 
   // Phase
-  console.log(`  Phase:   ${emoji} ${phaseColor(state.phase)}`);
+  const noTddLabel = state.noTdd ? chalk.gray(' (no-TDD)') : '';
+  console.log(`  Phase:   ${emoji} ${phaseColor(state.phase)}${noTddLabel}`);
 
   // Feature
   if (state.featureName) {
@@ -75,8 +76,15 @@ export function showStatus(): void {
   console.log();
 }
 
-function getElapsed(isoDate: string): string {
-  const ms = Date.now() - new Date(isoDate).getTime();
+export function getElapsed(isoDate: string): string {
+  return formatDuration(Date.now() - new Date(isoDate).getTime());
+}
+
+export function getElapsedBetween(startIso: string, endIso: string): string {
+  return formatDuration(new Date(endIso).getTime() - new Date(startIso).getTime());
+}
+
+function formatDuration(ms: number): string {
   const secs = Math.floor(ms / 1000);
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);

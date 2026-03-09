@@ -73,7 +73,15 @@ export function setPhase(target: string, options: { force?: boolean; skipGate?: 
     console.log(chalk.gray('  Make the test pass, then: oops phase refactor'));
   } else if (to === 'REFACTOR') {
     console.log(chalk.blue('\n  Both test and implementation files can be modified.'));
-    console.log(chalk.gray('  Refactor safely, then: oops feature complete'));
+    console.log('');
+    console.log(chalk.bold('  🔵 Refactoring checklist:'));
+    console.log(chalk.gray('    • マジックナンバー/文字列を定数に抽出'));
+    console.log(chalk.gray('    • 変数名・関数名をより明確に'));
+    console.log(chalk.gray('    • 長い関数を小さく分割'));
+    console.log(chalk.gray('    • コードの重複を除去'));
+    console.log('');
+    console.log(chalk.yellow('  ⚠️  テストは常にグリーンを維持すること'));
+    console.log(chalk.gray('  ✓  完了したら: oops feature complete'));
   } else {
     console.log(chalk.gray('\n  All restrictions lifted.'));
   }

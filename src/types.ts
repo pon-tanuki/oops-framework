@@ -57,6 +57,7 @@ export interface OopsState {
   };
   featureName?: string;
   startedAt?: string;
+  noTdd?: boolean;
   metadata: {
     created: string;
     phase0Start: string | null;
@@ -145,6 +146,8 @@ export interface Subtask {
   status: SubtaskStatus;
   oopsCount: number;
   cycles: number;
+  startedAt?: string;
+  completedAt?: string;
 }
 
 export interface OopsPlan {
