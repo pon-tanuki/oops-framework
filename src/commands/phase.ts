@@ -57,6 +57,12 @@ export function setPhase(target: string, options: { force?: boolean; skipGate?: 
       return;
     }
     console.log(chalk.green(`  ✓ Gate check passed`));
+    if (result.qualityWarnings && result.qualityWarnings.length > 0) {
+      console.log(chalk.yellow(`  ⚠ Quality warnings:`));
+      for (const w of result.qualityWarnings) {
+        console.log(chalk.yellow(`    - ${w}`));
+      }
+    }
   }
 
   transitionPhase(to, { ...options, skipGate: true });

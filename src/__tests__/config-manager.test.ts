@@ -55,10 +55,8 @@ describe('Config file I/O', () => {
 
     assert.equal(config.testCommand, 'npm test');
     assert.equal(config.debug, false);
-    assert.deepEqual(config.features, {
-      autoGateCheck: true,
-      postToolUseTestRunner: false,
-    });
+    assert.equal(config.features.autoGateCheck, true);
+    assert.equal(config.features.postToolUseTestRunner, false);
   });
 
   it('should preserve feature flags through round-trip', () => {
@@ -67,6 +65,7 @@ describe('Config file I/O', () => {
       features: {
         autoGateCheck: false,
         postToolUseTestRunner: true,
+        qualityGate: true,
       },
     };
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + '\n');

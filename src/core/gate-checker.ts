@@ -1,12 +1,14 @@
-import { readdirSync, existsSync } from 'node:fs';
 import { updateState } from './state-manager.js';
 import { readConfig } from './config-manager.js';
 import { runTests as defaultRunTests } from './test-runner.js';
-import type { GateResult, Phase, TestResult } from '../types.js';
+import { checkTestQuality as defaultCheckTestQuality, runQualityCommand as defaultRunQualityCommand, findTestFiles } from './quality-checker.js';
+import type { GateResult, Phase, TestResult, TestQualityResult, QualityCommandResult } from '../types.js';
 
 // Allow dependency injection for testing
 type TestRunner = () => TestResult;
 type TestFileFinder = (dir?: string) => string[];
+type QualityChecker = () => TestQualityResult;
+type QualityCommandRunner = (cmd: string) => QualityCommandResult;
 
 export function extractTestSummary(output: string): string {
   const lines = output.split('\n');
@@ -46,42 +48,30 @@ function extractFailingTests(output: string): string[] {
   return failures.slice(0, 10); // Limit to 10
 }
 
-function defaultFindTestFiles(dir: string = '.'): string[] {
-  const config = readConfig();
-  const pattern = new RegExp(config.testFilePattern);
-  const results: string[] = [];
+// Reuse findTestFiles from quality-checker.ts (exported as findTestFiles)
+const defaultFindTestFiles = findTestFiles;
 
-  function walk(d: string): void {
-    if (!existsSync(d)) return;
-    const entries = readdirSync(d, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = `${d}/${entry.name}`;
-      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.oops') continue;
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else if (pattern.test(fullPath)) {
-        results.push(fullPath);
-      }
-    }
-  }
-
-  walk(dir);
-  return results;
+export interface GateDeps {
+  runTests?: TestRunner;
+  findTestFiles?: TestFileFinder;
+  checkQuality?: QualityChecker;
+  runQuality?: QualityCommandRunner;
+  qualityGateMode?: 'warn' | 'block';
 }
 
 export function checkGate(
   from: Phase,
   to: Phase,
-  deps?: { runTests?: TestRunner; findTestFiles?: TestFileFinder }
+  deps?: GateDeps
 ): GateResult {
   const run = deps?.runTests ?? defaultRunTests;
   const find = deps?.findTestFiles ?? defaultFindTestFiles;
 
   if (from === 'RED' && to === 'GREEN') {
-    return checkRedToGreen(run, find);
+    return checkRedToGreen(run, find, deps);
   }
   if (from === 'GREEN' && to === 'REFACTOR') {
-    return checkGreenToRefactor(run);
+    return checkGreenToRefactor(run, deps);
   }
   if (from === 'REFACTOR' && to === 'RED') {
     return checkRefactorToRed(run);
@@ -89,7 +79,7 @@ export function checkGate(
   return { passed: true, reason: 'No gate check required' };
 }
 
-function checkRedToGreen(runTests: TestRunner, findTestFiles: TestFileFinder): GateResult {
+function checkRedToGreen(runTests: TestRunner, findTestFiles: TestFileFinder, deps?: GateDeps): GateResult {
   const details: string[] = [];
 
   // 1. Test files exist
@@ -127,10 +117,26 @@ function checkRedToGreen(runTests: TestRunner, findTestFiles: TestFileFinder): G
     testResults: { ...state.testResults, total: testFiles.length },
   }));
 
+  // 3. Quality gate check (if available)
+  const qualityWarnings = checkTestQualityGate(deps);
+  if (qualityWarnings.length > 0) {
+    const mode = deps?.qualityGateMode ?? getQualityGateMode();
+    if (mode === 'block') {
+      return {
+        passed: false,
+        reason: 'Test quality gate failed. Improve test quality before proceeding.',
+        details: [...details, ...qualityWarnings],
+        testOutput: summary,
+        qualityWarnings,
+      };
+    }
+    return { passed: true, reason: 'Gate passed: tests exist and fail as expected', details, testOutput: summary, qualityWarnings };
+  }
+
   return { passed: true, reason: 'Gate passed: tests exist and fail as expected', details, testOutput: summary };
 }
 
-function checkGreenToRefactor(runTests: TestRunner): GateResult {
+function checkGreenToRefactor(runTests: TestRunner, deps?: GateDeps): GateResult {
   const details: string[] = [];
 
   const result = runTests();
@@ -161,7 +167,75 @@ function checkGreenToRefactor(runTests: TestRunner): GateResult {
     testResults: { ...state.testResults },
   }));
 
+  // Quality command check (if available)
+  const qualityWarnings = checkQualityCommandGate(deps);
+  if (qualityWarnings.length > 0) {
+    const mode = deps?.qualityGateMode ?? getQualityGateMode();
+    if (mode === 'block') {
+      return {
+        passed: false,
+        reason: 'Quality gate failed. Fix lint/quality issues before proceeding.',
+        details: [...details, ...qualityWarnings],
+        testOutput: summary,
+        qualityWarnings,
+      };
+    }
+    return { passed: true, reason: 'Gate passed: all tests passing', details, testOutput: summary, qualityWarnings };
+  }
+
   return { passed: true, reason: 'Gate passed: all tests passing', details, testOutput: summary };
+}
+
+function getQualityGateMode(): 'warn' | 'block' {
+  try {
+    const config = readConfig();
+    return config.qualityGate?.mode ?? 'warn';
+  } catch {
+    return 'warn';
+  }
+}
+
+function checkTestQualityGate(deps?: GateDeps): string[] {
+  try {
+    const config = readConfig();
+    if (!config.features?.qualityGate) return [];
+
+    const checker = deps?.checkQuality ?? (() => defaultCheckTestQuality());
+    const result = checker();
+    return result.issues;
+  } catch {
+    return [];
+  }
+}
+
+function checkQualityCommandGate(deps?: GateDeps): string[] {
+  try {
+    const config = readConfig();
+    if (!config.features?.qualityGate) return [];
+
+    const qualityCommand = config.qualityGate?.qualityCommand;
+    const runner = deps?.runQuality;
+
+    // No command configured and no injected runner — skip
+    if (!qualityCommand && !runner) return [];
+
+    // Use injected runner or fall back to real command
+    if (runner) {
+      const result = runner(qualityCommand ?? '');
+      if (!result.passed) {
+        return [`Quality command failed: ${result.output}`];
+      }
+      return [];
+    }
+
+    const result = defaultRunQualityCommand(qualityCommand);
+    if (!result.passed) {
+      return [`Quality command failed: ${result.output}`];
+    }
+    return [];
+  } catch {
+    return [];
+  }
 }
 
 function checkRefactorToRed(runTests: TestRunner): GateResult {
