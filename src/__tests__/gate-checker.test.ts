@@ -139,3 +139,92 @@ describe('No gate required', () => {
     assert.match(result.reason, /No gate check required/);
   });
 });
+
+// --- Quality gate integration tests ---
+
+describe('RED → GREEN gate with quality checks', () => {
+  it('should include quality warnings when test quality is low', () => {
+    const result = checkGate('RED', 'GREEN', {
+      runTests: failingTests,
+      findTestFiles: someTestFiles,
+      checkQuality: () => ({
+        testCaseCount: 1,
+        assertionCount: 0,
+        assertionsPerTest: 0,
+        hasErrorCases: false,
+        issues: ['Only 1 test case(s) found (minimum: 3)', 'No error/edge case tests found.'],
+      }),
+      qualityGateMode: 'warn',
+    });
+    assert.equal(result.passed, true);
+    assert.ok(result.qualityWarnings);
+    assert.ok(result.qualityWarnings!.length > 0);
+  });
+
+  it('should block gate when quality mode is block and issues exist', () => {
+    const result = checkGate('RED', 'GREEN', {
+      runTests: failingTests,
+      findTestFiles: someTestFiles,
+      checkQuality: () => ({
+        testCaseCount: 1,
+        assertionCount: 0,
+        assertionsPerTest: 0,
+        hasErrorCases: false,
+        issues: ['Only 1 test case(s) found (minimum: 3)'],
+      }),
+      qualityGateMode: 'block',
+    });
+    assert.equal(result.passed, false);
+    assert.match(result.reason, /quality/i);
+  });
+
+  it('should pass when quality checks have no issues', () => {
+    const result = checkGate('RED', 'GREEN', {
+      runTests: failingTests,
+      findTestFiles: someTestFiles,
+      checkQuality: () => ({
+        testCaseCount: 5,
+        assertionCount: 10,
+        assertionsPerTest: 2,
+        hasErrorCases: true,
+        issues: [],
+      }),
+      qualityGateMode: 'warn',
+    });
+    assert.equal(result.passed, true);
+    assert.ok(!result.qualityWarnings || result.qualityWarnings.length === 0);
+  });
+});
+
+describe('GREEN → REFACTOR gate with quality command', () => {
+  it('should include quality warnings when lint command fails and mode is warn', () => {
+    const result = checkGate('GREEN', 'REFACTOR', {
+      runTests: passingTests,
+      runQuality: () => ({ passed: false, output: '3 errors found' }),
+      qualityGateMode: 'warn',
+    });
+    assert.equal(result.passed, true);
+    assert.ok(result.qualityWarnings);
+    assert.ok(result.qualityWarnings!.some(w => /3 errors/.test(w)));
+  });
+
+  it('should block gate when lint command fails and mode is block', () => {
+    const result = checkGate('GREEN', 'REFACTOR', {
+      runTests: passingTests,
+      runQuality: () => ({ passed: false, output: 'lint errors' }),
+      qualityGateMode: 'block',
+    });
+    assert.equal(result.passed, false);
+    assert.match(result.reason, /quality|lint/i);
+  });
+
+  it('should pass when lint command succeeds', () => {
+    const result = checkGate('GREEN', 'REFACTOR', {
+      runTests: passingTests,
+      runQuality: () => ({ passed: true, output: 'all good' }),
+      qualityGateMode: 'warn',
+    });
+    assert.equal(result.passed, true);
+    assert.ok(!result.qualityWarnings || result.qualityWarnings.length === 0);
+  });
+});

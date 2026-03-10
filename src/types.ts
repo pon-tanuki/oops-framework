@@ -65,6 +65,16 @@ export interface OopsState {
   };
 }
 
+export interface QualityGateConfig {
+  mode: 'warn' | 'block';
+  minTestCases: number;
+  minAssertionsPerTest: number;
+  requireErrorCases: boolean;
+  coverageCommand?: string;
+  minCoverage?: number;
+  qualityCommand?: string;
+}
+
 export interface OopsConfig {
   version: string;
   testCommand: string;
@@ -72,9 +82,11 @@ export interface OopsConfig {
   testTimeout: number;
   debug: boolean;
   excludePatterns: string[];
+  qualityGate: QualityGateConfig;
   features: {
     autoGateCheck: boolean;
     postToolUseTestRunner: boolean;
+    qualityGate: boolean;
   };
 }
 
@@ -83,6 +95,20 @@ export interface GateResult {
   reason: string;
   details?: string[];
   testOutput?: string;
+  qualityWarnings?: string[];
+}
+
+export interface TestQualityResult {
+  testCaseCount: number;
+  assertionCount: number;
+  assertionsPerTest: number;
+  hasErrorCases: boolean;
+  issues: string[];
+}
+
+export interface QualityCommandResult {
+  passed: boolean;
+  output: string;
 }
 
 export interface TestResult {
@@ -128,9 +154,16 @@ export const DEFAULT_CONFIG: OopsConfig = {
     '.oops/**',
     '.claude/**',
   ],
+  qualityGate: {
+    mode: 'warn',
+    minTestCases: 3,
+    minAssertionsPerTest: 1,
+    requireErrorCases: true,
+  },
   features: {
     autoGateCheck: true,
     postToolUseTestRunner: false,
+    qualityGate: true,
   },
 };
 

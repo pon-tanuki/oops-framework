@@ -68,3 +68,71 @@ describe('detectTestCommand', () => {
     assert.equal(detectTestCommand(TMP_DIR), null);
   });
 });
+
+const QUALITY_TMP = '.oops-quality-detect-tmp';
+
+describe('detectQualityCommand', () => {
+  before(() => {
+    mkdirSync(QUALITY_TMP, { recursive: true });
+  });
+
+  after(() => {
+    rmSync(QUALITY_TMP, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    for (const f of ['.eslintrc.json', 'eslint.config.js', 'biome.json', 'biome.jsonc', 'pyproject.toml', 'Cargo.toml', '.golangci.yml']) {
+      const p = join(QUALITY_TMP, f);
+      if (existsSync(p)) rmSync(p);
+    }
+  });
+
+  it('should detect ESLint from .eslintrc.json', async () => {
+    writeFileSync(join(QUALITY_TMP, '.eslintrc.json'), '{}');
+    const { detectQualityCommand } = await import('../core/project-detector.js');
+    assert.equal(detectQualityCommand(QUALITY_TMP), 'npx eslint src/ --max-warnings 0');
+  });
+
+  it('should detect ESLint from eslint.config.js', async () => {
+    writeFileSync(join(QUALITY_TMP, 'eslint.config.js'), 'export default [];');
+    const { detectQualityCommand } = await import('../core/project-detector.js');
+    assert.equal(detectQualityCommand(QUALITY_TMP), 'npx eslint src/ --max-warnings 0');
+  });
+
+  it('should detect Biome from biome.json', async () => {
+    writeFileSync(join(QUALITY_TMP, 'biome.json'), '{}');
+    const { detectQualityCommand } = await import('../core/project-detector.js');
+    assert.equal(detectQualityCommand(QUALITY_TMP), 'npx biome check src/');
+  });
+
+  it('should detect ruff from pyproject.toml with tool.ruff', async () => {
+    writeFileSync(join(QUALITY_TMP, 'pyproject.toml'), '[tool.ruff]\nselect = ["E"]');
+    const { detectQualityCommand } = await import('../core/project-detector.js');
+    assert.equal(detectQualityCommand(QUALITY_TMP), 'ruff check .');
+  });
+
+  it('should not detect ruff from pyproject.toml without tool.ruff', async () => {
+    writeFileSync(join(QUALITY_TMP, 'pyproject.toml'), '[tool.pytest]');
+    const { detectQualityCommand } = await import('../core/project-detector.js');
+    // May still detect cargo clippy if Cargo.toml exists, so just check it's not ruff
+    const result = detectQualityCommand(QUALITY_TMP);
+    assert.notEqual(result, 'ruff check .');
+  });
+
+  it('should detect cargo clippy from Cargo.toml', async () => {
+    writeFileSync(join(QUALITY_TMP, 'Cargo.toml'), '[package]\nname = "test"');
+    const { detectQualityCommand } = await import('../core/project-detector.js');
+    assert.equal(detectQualityCommand(QUALITY_TMP), 'cargo clippy -- -D warnings');
+  });
+
+  it('should detect golangci-lint from .golangci.yml', async () => {
+    writeFileSync(join(QUALITY_TMP, '.golangci.yml'), 'linters: {}');
+    const { detectQualityCommand } = await import('../core/project-detector.js');
+    assert.equal(detectQualityCommand(QUALITY_TMP), 'golangci-lint run');
+  });
+
+  it('should return null when no linter config found', async () => {
+    const { detectQualityCommand } = await import('../core/project-detector.js');
+    assert.equal(detectQualityCommand(QUALITY_TMP), null);
+  });
+});

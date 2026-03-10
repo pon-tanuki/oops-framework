@@ -5,7 +5,7 @@ import { stateExists, writeState } from '../core/state-manager.js';
 import { configExists, writeConfig } from '../core/config-manager.js';
 import { DEFAULT_STATE, DEFAULT_CONFIG } from '../types.js';
 import { PACKAGE_ROOT } from '../cli/index.js';
-import { detectTestCommand } from '../core/project-detector.js';
+import { detectTestCommand, detectQualityCommand } from '../core/project-detector.js';
 
 // --- Hook script content ---
 
@@ -179,10 +179,17 @@ export function initOops(options: { force?: boolean; testCommand?: string } = {}
     if (detected) {
       config.testCommand = detected;
     }
+    const qualityCmd = detectQualityCommand();
+    if (qualityCmd) {
+      config.qualityGate = { ...config.qualityGate, qualityCommand: qualityCmd };
+    }
     writeConfig(config);
     console.log(chalk.green('  ✅ Created .oops/config.json'));
     if (detected && detected !== DEFAULT_CONFIG.testCommand) {
       console.log(chalk.cyan(`     Test command auto-detected: ${detected}`));
+    }
+    if (qualityCmd) {
+      console.log(chalk.cyan(`     Quality command auto-detected: ${qualityCmd}`));
     }
   } else {
     console.log(chalk.gray('  ✓ .oops/config.json exists'));
